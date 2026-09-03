@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+:root {
+  /* Base — clean SaaS surface, Ydea Solar palette */
+  --page-bg: #f2f2f2;
+  --panel-bg: #f7f7f5;
+  --card-bg: #ffffff;
+  --border: #e8e8e8;
+  --border-soft: #efefed;
+
+  /* Sidebar — graphite */
+  --sidebar-bg: #1a1a1a;
+  --sidebar-bg-alt: #2c2c2c;
+
+  /* Brand — Verde Lima */
+  --brand: #aadd00;
+  --brand-strong: #8cb800;
+  --brand-soft: #f2ffe0;
+
+  /* Text */
+  --text-dark: #1a1a1a;
+  --text-gray: #666666;
+  --text-faint: #979c9f;
+
+  /* Status accents */
+  --blue: #3b82f6;
+  --green: #17a24d;
+  --amber: #f59e0b;
+  --red: #ff4d4d;
+
+  --badge-blue-bg: #e8f0ff;
+  --badge-blue-text: #2f5fd6;
+  --badge-green-bg: #e6f8ec;
+  --badge-green-text: #17a24d;
+  --badge-red-bg: #ffe9e9;
+  --badge-red-text: #ff4d4d;
+  --badge-amber-bg: #fef3e0;
+  --badge-amber-text: #d97e06;
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+@theme inline {
+  --color-page-bg: var(--page-bg);
+  --color-panel-bg: var(--panel-bg);
+  --color-card-bg: var(--card-bg);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-bg-alt: var(--sidebar-bg-alt);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-text-dark: var(--text-dark);
+  --color-text-gray: var(--text-gray);
+  --color-text-faint: var(--text-faint);
+  --color-blue: var(--blue);
+  --color-green: var(--green);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-badge-blue-bg: var(--badge-blue-bg);
+  --color-badge-blue-text: var(--badge-blue-text);
+  --color-badge-green-bg: var(--badge-green-bg);
+  --color-badge-green-text: var(--badge-green-text);
+  --color-badge-red-bg: var(--badge-red-bg);
+  --color-badge-red-text: var(--badge-red-text);
+  --color-badge-amber-bg: var(--badge-amber-bg);
+  --color-badge-amber-text: var(--badge-amber-text);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text-dark);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* --- Modal fade + scale --- */
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes sheet-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.97) translateY(6px); }
+}
+.animate-overlay-in {
+  animation: overlay-in 180ms ease-out both;
+}
+.animate-sheet-in {
+  animation: sheet-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-sheet-out {
+  animation: sheet-out 160ms ease-in both;
+}
+
+/* --- Toast --- */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-toast-in {
+  animation: toast-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Dropdown --- */
+@keyframes dropdown-in {
+  from { opacity: 0; transform: scaleY(0.96) translateY(-2px); }
+  to { opacity: 1; transform: scaleY(1) translateY(0); }
+}
+.animate-dropdown-in {
+  animation: dropdown-in 140ms ease-out both;
+  transform-origin: top;
+}
+
+/* --- Skeleton --- */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.animate-skeleton {
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
+
+/* --- Spinner --- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin 0.7s linear infinite;
+}
