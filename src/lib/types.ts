@@ -61,6 +61,15 @@ export type DashboardWidget = {
 
 export type DealPrioridade = "baixa" | "media" | "alta";
 export type DealStatus = "aberto" | "ganho" | "perdido";
+export type PerfilCliente = "residencial" | "comercial" | "rural" | "industrial" | "condominio";
+
+export const PERFIL_CLIENTE_LABEL: Record<PerfilCliente, string> = {
+  residencial: "Residencial",
+  comercial: "Comercial",
+  rural: "Rural",
+  industrial: "Industrial",
+  condominio: "Condomínio",
+};
 
 export type DocumentoTipo =
   | "conta_energia"
@@ -89,6 +98,45 @@ export type DocumentoAnexo = {
   nome: string;
   tamanho: number;
   previewUrl?: string;
+  /** Caminho no Firebase Storage — necessário pra poder excluir o arquivo depois. */
+  storagePath?: string;
+  uploadedAt?: string;
+};
+
+/** Anotação/comentário no negócio (aba "Anotações"). */
+export type Anotacao = {
+  id: string;
+  texto: string;
+  autorId: string;
+  autorNome: string;
+  criadoEm: string; // ISO datetime
+};
+
+export type AtividadeTipo = "ligacao" | "reuniao" | "visita" | "email" | "tarefa" | "whatsapp";
+
+export const ATIVIDADE_TIPO_LABEL: Record<AtividadeTipo, string> = {
+  ligacao: "Ligação",
+  reuniao: "Reunião",
+  visita: "Visita",
+  email: "E-mail",
+  tarefa: "Tarefa",
+  whatsapp: "WhatsApp",
+};
+
+/** Atividade agendada vinculada ao negócio (aba "Atividades"). */
+export type Atividade = {
+  id: string;
+  tipo: AtividadeTipo;
+  titulo: string;
+  prioridade: DealPrioridade;
+  data: string; // YYYY-MM-DD
+  horaInicio: string; // HH:mm
+  horaFim: string; // HH:mm
+  responsavelId: string;
+  responsavelNome: string;
+  observacoes?: string;
+  concluida: boolean;
+  criadoEm: string;
 };
 
 export type Deal = {
@@ -136,6 +184,17 @@ export type Deal = {
   drone?: boolean;
   trocaTitularidade?: boolean;
   validadeProposta?: string;
+
+  // Campos adicionais observados no negócio real (perfil, concessionária, NPS)
+  perfilCliente?: PerfilCliente;
+  concessionaria?: string;
+  npsVenda?: number;
+  npsInstalacao?: number;
+  npsPosVenda?: number;
+
+  // Ganho/Perdido
+  motivoPerda?: string;
+  fechadoEm?: string;
 
   documentos?: DocumentoAnexo[];
   observacoes?: string;

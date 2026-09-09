@@ -122,7 +122,7 @@ function Column({
 }
 
 export default function FunnelBoard() {
-  const { deals, addDeal, updateDeal, currentUser } = useCrmData();
+  const { deals, dealsLoading, addDeal, updateDeal, currentUser } = useCrmData();
   const visibleFunnels = useMemo(
     () => FUNNELS.filter((f) => hasPermission(currentUser.cargoId, `funil.${f.id}`)),
     [currentUser.cargoId]
@@ -178,8 +178,8 @@ export default function FunnelBoard() {
     updateDeal(String(active.id), { stageId: newStage });
   }
 
-  function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">) {
-    addDeal(newDeal);
+  async function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">) {
+    await addDeal(newDeal);
     setModalOpen(false);
   }
 
@@ -225,6 +225,12 @@ export default function FunnelBoard() {
 
       <div className="border-b border-border mb-5" />
 
+      {dealsLoading ? (
+        <div className="flex items-center justify-center py-16 text-sm text-text-faint gap-2">
+          <span className="h-4 w-4 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+          Carregando negócios do Firestore...
+        </div>
+      ) : (
       <DndContext
         key={funnelId}
         sensors={sensors}
@@ -247,6 +253,7 @@ export default function FunnelBoard() {
           {activeDeal ? <DealCard deal={activeDeal} dragging /> : null}
         </DragOverlay>
       </DndContext>
+      )}
 
       {modalOpen && (
         <NewDealModal
@@ -257,7 +264,11 @@ export default function FunnelBoard() {
       )}
 
       {openDealId && (
-        <DealDetailPanel dealId={openDealId} onClose={() => setOpenDealId(null)} />
+        <DealDetailPanel
+          dealId={openDealId}
+          onClose={() => setOpenDealId(null)}
+          onOpenDeal={setOpenDealId}
+        />
       )}
     </div>
   );

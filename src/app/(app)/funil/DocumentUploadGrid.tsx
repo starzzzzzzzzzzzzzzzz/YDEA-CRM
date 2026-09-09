@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Upload, Eye, Trash2, FileText } from "lucide-react";
+import { Upload, Eye, Trash2, FileText, Loader2 } from "lucide-react";
 import { DocumentoAnexo, DocumentoTipo, DOCUMENTO_LABEL } from "@/lib/types";
+import { uploadDocumento, deleteDocumento } from "@/lib/firebase/storage";
 
 const DOC_TYPES: DocumentoTipo[] = [
   "conta_energia",
@@ -18,11 +19,13 @@ const DOC_TYPES: DocumentoTipo[] = [
 function DocCard({
   tipo,
   arquivos,
+  uploading,
   onAdd,
   onRemove,
 }: {
   tipo: DocumentoTipo;
   arquivos: DocumentoAnexo[];
+  uploading: boolean;
   onAdd: (files: FileList) => void;
   onRemove: (id: string) => void;
 }) {
@@ -62,10 +65,11 @@ function DocCard({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="h-7 w-7 rounded-md flex items-center justify-center text-brand-strong hover:bg-brand-soft transition-colors shrink-0"
+          disabled={uploading}
+          className="h-7 w-7 rounded-md flex items-center justify-center text-brand-strong hover:bg-brand-soft transition-colors shrink-0 disabled:opacity-50"
           aria-label={`Enviar ${DOCUMENTO_LABEL[tipo]}`}
         >
-          <Upload size={14} />
+          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
         </button>
         <input
           ref={inputRef}
@@ -133,25 +137,55 @@ function DocCard({
 }
 
 export default function DocumentUploadGrid({
+  dealId,
   documentos,
   onChange,
 }: {
+  /** Quando fornecido, os arquivos sobem de verdade pro Firebase Storage (deals/{dealId}/...).
+   * Sem isso (ex.: criando um negócio novo que ainda não tem id), fica só como preview local. */
+  dealId?: string;
   documentos: DocumentoAnexo[];
   onChange: (docs: DocumentoAnexo[]) => void;
 }) {
-  function handleAdd(tipo: DocumentoTipo, files: FileList) {
-    const novos: DocumentoAnexo[] = Array.from(files).map((f) => ({
-      id: `doc${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-      tipo,
-      nome: f.name,
-      tamanho: f.size,
-      previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
-    }));
-    onChange([...documentos, ...novos]);
+  const [uploadingTipo, setUploadingTipo] = useState<DocumentoTipo | null>(null);
+
+  async function handleAdd(tipo: DocumentoTipo, files: FileList) {
+    if (!dealId) {
+      // Sem negócio salvo ainda: só guarda um preview local (blob), não persiste.
+      const novos: DocumentoAnexo[] = Array.from(files).map((f) => ({
+        id: `doc${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        tipo,
+        nome: f.name,
+        tamanho: f.size,
+        previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+      }));
+      onChange([...documentos, ...novos]);
+      return;
+    }
+
+    setUploadingTipo(tipo);
+    try {
+      const enviados = await Promise.all(
+        Array.from(files).map((f) => uploadDocumento(dealId, f, tipo))
+      );
+      onChange([...documentos, ...enviados]);
+    } catch (err) {
+      console.error("Erro ao enviar arquivo pro Storage:", err);
+    } finally {
+      setUploadingTipo(null);
+    }
   }
 
-  function handleRemove(id: string) {
+  async function handleRemove(id: string) {
+    const doc = documentos.find((d) => d.id === id);
     onChange(documentos.filter((d) => d.id !== id));
+    if (doc?.storagePath) {
+      try {
+        await deleteDocumento(doc.storagePath);
+      } catch (err) {
+        console.error("Erro ao excluir arquivo do Storage:", err);
+      }
+    }
   }
 
   return (
@@ -161,6 +195,7 @@ export default function DocumentUploadGrid({
           key={tipo}
           tipo={tipo}
           arquivos={documentos.filter((d) => d.tipo === tipo)}
+          uploading={uploadingTipo === tipo}
           onAdd={(files) => handleAdd(tipo, files)}
           onRemove={handleRemove}
         />

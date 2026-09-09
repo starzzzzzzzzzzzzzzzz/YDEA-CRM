@@ -81,8 +81,17 @@ mesma tabela.
   numa chamada só (`/api/admin/usuarios`, protegida — só admin pode chamar).
 - **Cargos e permissões** (quem vê o quê) continuam definidos no código
   (`src/lib/db/cargos.ts` e `permissoes.ts`).
-- Clientes, negócios (funil) e leads **ainda são dados fictícios em memória** —
-  próxima frente natural: mover essas coleções pro Firestore também.
+- Clientes e negócios (funil) já são reais no Firestore. Leads **ainda são
+  dados fictícios em memória** — próxima frente a migrar.
+
+## Ativar o Firebase Storage (documentos e fotos do negócio)
+
+1. No Firebase Console: menu lateral → **Storage** → **Vamos começar/Get started**.
+2. Escolha o modo de produção (igual fizemos no Firestore) e a mesma região.
+3. Na aba **Regras** do Storage, cole o conteúdo do arquivo `storage.rules`
+   (na raiz do projeto) e publique. *Isso é uma aba separada da regra do
+   Firestore — são dois produtos diferentes, cada um com sua própria tela de
+   regras no Console.*
 
 ## Importante pra produção
 
@@ -93,3 +102,8 @@ arquivo pro Git; na maioria dos serviços de hospedagem dá pra configurar isso
 como uma variável de ambiente segura em vez de um arquivo — se for hospedar
 em algo como Vercel, me avisa que ajusto o código pra ler de variável de
 ambiente em vez do arquivo local.
+
+## Histórico de versões
+
+Veja o `CHANGELOG.md` na raiz do projeto — toda entrega registra ali o que
+mudou e o que ainda falta.

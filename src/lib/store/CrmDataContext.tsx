@@ -13,9 +13,15 @@ import {
 } from "@/lib/types";
 import { MOCK_ORGANIZACOES } from "@/lib/mock-organizacoes";
 import { MOCK_PESSOAS } from "@/lib/mock-pessoas";
-import { MOCK_DEALS } from "@/lib/mock-deals";
 import { MOCK_LEADS } from "@/lib/mock-leads";
 import { fetchClientes, createCliente } from "@/lib/firebase/clientes";
+import {
+  fetchDeals,
+  createDeal,
+  updateDealDoc,
+  deleteDeal as deleteDealDoc,
+  duplicateDeal as duplicateDealDoc,
+} from "@/lib/firebase/deals";
 
 type CrmDataContextValue = {
   organizacoes: Organizacao[];
@@ -24,13 +30,17 @@ type CrmDataContextValue = {
   /** true enquanto a lista de clientes ainda está sendo carregada do Firestore. */
   clientesLoading: boolean;
   deals: Deal[];
+  /** true enquanto a lista de negócios ainda está sendo carregada do Firestore. */
+  dealsLoading: boolean;
   leads: Lead[];
   /** Usuário real, autenticado via Firebase Auth + Firestore (ver AuthContext). */
   currentUser: Usuario;
   addOrganizacao: (org: Organizacao) => void;
   addPessoa: (pessoa: Pessoa) => void;
-  addDeal: (deal: Omit<Deal, "id" | "createdAt">) => Deal;
+  addDeal: (deal: Omit<Deal, "id" | "createdAt">) => Promise<Deal>;
   updateDeal: (id: string, patch: Partial<Deal>) => void;
+  removeDeal: (id: string) => Promise<void>;
+  duplicateDeal: (deal: Deal) => Promise<Deal>;
   addLead: (lead: Omit<Lead, "id" | "stage">) => Lead;
   updateLead: (id: string, patch: Partial<Lead>) => void;
   getOrganizacao: (id?: string) => Organizacao | undefined;
@@ -57,8 +67,9 @@ export function CrmDataProvider({
   const [pessoas, setPessoas] = useState<Pessoa[]>(MOCK_PESSOAS);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesLoading, setClientesLoading] = useState(true);
-  // Funil/Leads ainda são dados fictícios em memória — próxima frente a migrar pro Firestore.
-  const [deals, setDeals] = useState<Deal[]>(MOCK_DEALS);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [dealsLoading, setDealsLoading] = useState(true);
+  // Leads ainda são dado fictício em memória — próxima frente a migrar pro Firestore.
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
 
   useEffect(() => {
@@ -70,6 +81,21 @@ export function CrmDataProvider({
       .catch((err) => console.error("Erro ao carregar clientes do Firestore:", err))
       .finally(() => {
         if (!cancelado) setClientesLoading(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    fetchDeals()
+      .then((rows) => {
+        if (!cancelado) setDeals(rows);
+      })
+      .catch((err) => console.error("Erro ao carregar negócios do Firestore:", err))
+      .finally(() => {
+        if (!cancelado) setDealsLoading(false);
       });
     return () => {
       cancelado = true;
@@ -144,18 +170,30 @@ export function CrmDataProvider({
       .catch((err) => console.error("Erro ao salvar cliente (pessoa) no Firestore:", err));
   }
 
-  function addDeal(deal: Omit<Deal, "id" | "createdAt">): Deal {
-    const full: Deal = {
-      ...deal,
-      id: `d${Date.now()}`,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setDeals((prev) => [...prev, full]);
-    return full;
+  async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
+    const criado = await createDeal(deal);
+    setDeals((prev) => [criado, ...prev]);
+    return criado;
   }
 
   function updateDeal(id: string, patch: Partial<Deal>) {
+    // Otimista: reflete na hora na tela (essencial pro drag-and-drop do Kanban não travar),
+    // e grava no Firestore em paralelo.
     setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    updateDealDoc(id, patch).catch((err) =>
+      console.error("Erro ao salvar alteração do negócio no Firestore:", err)
+    );
+  }
+
+  async function removeDeal(id: string): Promise<void> {
+    await deleteDealDoc(id);
+    setDeals((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  async function duplicateDeal(deal: Deal): Promise<Deal> {
+    const copia = await duplicateDealDoc(deal);
+    setDeals((prev) => [copia, ...prev]);
+    return copia;
   }
 
   function addLead(lead: Omit<Lead, "id" | "stage">): Lead {
@@ -183,19 +221,22 @@ export function CrmDataProvider({
       clientes,
       clientesLoading,
       deals,
+      dealsLoading,
       leads,
       currentUser,
       addOrganizacao,
       addPessoa,
       addDeal,
       updateDeal,
+      removeDeal,
+      duplicateDeal,
       addLead,
       updateLead,
       getOrganizacao,
       getPessoa,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [organizacoes, pessoas, clientes, clientesLoading, deals, leads, currentUser]
+    [organizacoes, pessoas, clientes, clientesLoading, deals, dealsLoading, leads, currentUser]
   );
 
   return <CrmDataContext.Provider value={value}>{children}</CrmDataContext.Provider>;
