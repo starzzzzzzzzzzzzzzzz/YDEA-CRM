@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -12,11 +12,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus, Filter, LayoutGrid, List, Download, Info } from "lucide-react";
+import { Plus, Filter, LayoutGrid, List, Download, Info, X } from "lucide-react";
 import { Deal, FunnelId } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { hasPermission } from "@/lib/db/permissoes";
+import { checarAtividadesPorDeals } from "@/lib/firebase/atividades";
 import FunnelSwitcher from "./FunnelSwitcher";
 import NewDealModal from "./NewDealModal";
 import DealDetailPanel from "./DealDetailPanel";
@@ -40,10 +41,13 @@ function formatBRL(value: number) {
 function DealCard({
   deal,
   dragging,
+  temAtividade,
   onOpen,
 }: {
   deal: Deal;
   dragging?: boolean;
+  /** true = tem atividade registrada (verde); false = nenhuma (vermelho); undefined = ainda carregando */
+  temAtividade?: boolean;
   onOpen?: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -65,9 +69,27 @@ function DealCard({
         isDragging && !dragging ? "opacity-30" : ""
       } ${dragging ? "shadow-md rotate-1" : "hover:border-brand"} transition-colors`}
     >
-      <h4 className="font-semibold text-text-dark text-[13px] leading-snug mb-3">
-        {deal.titulo}
-      </h4>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <h4 className="font-semibold text-text-dark text-[13px] leading-snug">
+          {deal.titulo}
+        </h4>
+        <span
+          title={
+            temAtividade === undefined
+              ? "Verificando atividades..."
+              : temAtividade
+                ? "Tem atividade registrada"
+                : "Sem atividade registrada"
+          }
+          className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
+            temAtividade === undefined
+              ? "bg-border"
+              : temAtividade
+                ? "bg-badge-green-text"
+                : "bg-badge-red-text"
+          }`}
+        />
+      </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <div
@@ -89,11 +111,13 @@ function Column({
   stageId,
   label,
   deals,
+  atividadesStatus,
   onOpenDeal,
 }: {
   stageId: string;
   label: string;
   deals: Deal[];
+  atividadesStatus: Record<string, boolean>;
   onOpenDeal: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stageId });
@@ -114,7 +138,12 @@ function Column({
         }`}
       >
         {deals.map((deal) => (
-          <DealCard key={deal.id} deal={deal} onOpen={onOpenDeal} />
+          <DealCard
+            key={deal.id}
+            deal={deal}
+            temAtividade={atividadesStatus[deal.id]}
+            onOpen={onOpenDeal}
+          />
         ))}
       </div>
     </div>
@@ -135,21 +164,16 @@ export default function FunnelBoard() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [openDealId, setOpenDealId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
+  const [atividadesStatus, setAtividadesStatus] = useState<Record<string, boolean>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
   const funnel = FUNNELS.find((f) => f.id === funnelId)!;
-
-  const dealsByStage = useMemo(() => {
-    const map = new Map<string, Deal[]>();
-    funnel.stages.forEach((s) => map.set(s.id, []));
-    deals
-      .filter((d) => d.funnelId === funnelId)
-      .forEach((d) => map.get(d.stageId)?.push(d));
-    return map;
-  }, [deals, funnel, funnelId]);
 
   const totalsById = useMemo(() => {
     const result: Record<string, { count: number; total: number }> = {};
@@ -165,6 +189,43 @@ export default function FunnelBoard() {
 
   const currentDeals = deals.filter((d) => d.funnelId === funnelId);
   const activeDeal = deals.find((d) => d.id === activeId);
+
+  const responsaveis = useMemo(
+    () => Array.from(new Set(currentDeals.map((d) => d.responsavel))).sort(),
+    [currentDeals]
+  );
+
+  const dealsFiltrados = useMemo(
+    () =>
+      filtroResponsavel === "todos"
+        ? currentDeals
+        : currentDeals.filter((d) => d.responsavel === filtroResponsavel),
+    [currentDeals, filtroResponsavel]
+  );
+
+  const dealsByStageFiltrado = useMemo(() => {
+    const map = new Map<string, Deal[]>();
+    funnel.stages.forEach((s) => map.set(s.id, []));
+    dealsFiltrados.forEach((d) => map.get(d.stageId)?.push(d));
+    return map;
+  }, [dealsFiltrados, funnel]);
+
+  // Ao trocar de funil (ou os negócios visíveis mudarem), busca no Firestore
+  // quais desses negócios já têm ao menos uma atividade registrada.
+  useEffect(() => {
+    const ids = currentDeals.map((d) => d.id);
+    if (ids.length === 0) return;
+    let cancelado = false;
+    checarAtividadesPorDeals(ids)
+      .then((status) => {
+        if (!cancelado) setAtividadesStatus((prev) => ({ ...prev, ...status }));
+      })
+      .catch((err) => console.error(err));
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDeals.map((d) => d.id).join(",")]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -195,21 +256,83 @@ export default function FunnelBoard() {
 
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1 text-sm text-text-gray">
-            {currentDeals.length} resultados
+            {dealsFiltrados.length} resultados
             <Info size={13} className="text-text-faint" />
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
-            <button className="h-9 w-9 flex items-center justify-center bg-brand-soft text-brand-strong">
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`h-9 w-9 flex items-center justify-center transition-colors ${
+                viewMode === "grid"
+                  ? "bg-brand-soft text-brand-strong"
+                  : "text-text-faint hover:text-text-gray"
+              }`}
+            >
               <LayoutGrid size={15} />
             </button>
-            <button className="h-9 w-9 flex items-center justify-center text-text-faint hover:text-text-gray border-l border-border">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`h-9 w-9 flex items-center justify-center border-l border-border transition-colors ${
+                viewMode === "list"
+                  ? "bg-brand-soft text-brand-strong"
+                  : "text-text-faint hover:text-text-gray"
+              }`}
+            >
               <List size={15} />
             </button>
           </div>
-          <button className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm text-text-gray hover:text-text-dark transition-colors">
-            <Filter size={14} />
-            Filtros
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setFiltrosAbertos((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm transition-colors ${
+                filtroResponsavel !== "todos"
+                  ? "border-brand text-brand-strong bg-brand-soft"
+                  : "border-border text-text-gray hover:text-text-dark"
+              }`}
+            >
+              <Filter size={14} />
+              Filtros
+              {filtroResponsavel !== "todos" && (
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-strong" />
+              )}
+            </button>
+            {filtrosAbertos && (
+              <div className="absolute right-0 top-11 z-20 w-64 rounded-lg border border-border bg-card-bg shadow-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-text-dark">Filtrar negócios</span>
+                  <button
+                    onClick={() => setFiltrosAbertos(false)}
+                    className="text-text-faint hover:text-text-gray"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <label className="block text-[11px] font-semibold text-text-gray mb-1.5 tracking-wide">
+                  RESPONSÁVEL
+                </label>
+                <select
+                  value={filtroResponsavel}
+                  onChange={(e) => setFiltroResponsavel(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-sm text-text-dark outline-none focus:border-brand"
+                >
+                  <option value="todos">Todos</option>
+                  {responsaveis.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+                {filtroResponsavel !== "todos" && (
+                  <button
+                    onClick={() => setFiltroResponsavel("todos")}
+                    className="mt-3 text-xs text-text-faint hover:text-text-gray underline"
+                  >
+                    Limpar filtro
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setModalOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
@@ -230,6 +353,65 @@ export default function FunnelBoard() {
           <span className="h-4 w-4 rounded-full border-2 border-brand border-t-transparent animate-spin" />
           Carregando negócios do Firestore...
         </div>
+      ) : viewMode === "list" ? (
+        <div className="rounded-xl border border-border overflow-hidden bg-card-bg">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-text-faint">
+                <th className="px-5 py-3 font-semibold">Negócio</th>
+                <th className="px-5 py-3 font-semibold">Etapa</th>
+                <th className="px-5 py-3 font-semibold">Responsável</th>
+                <th className="px-5 py-3 font-semibold">Valor</th>
+                <th className="px-5 py-3 font-semibold">Atividade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dealsFiltrados.map((deal) => {
+                const stage = funnel.stages.find((s) => s.id === deal.stageId);
+                const temAtividade = atividadesStatus[deal.id];
+                return (
+                  <tr
+                    key={deal.id}
+                    onClick={() => setOpenDealId(deal.id)}
+                    className="border-b border-border-soft last:border-0 hover:bg-panel-bg/60 cursor-pointer transition-colors"
+                  >
+                    <td className="px-5 py-3.5 font-medium text-text-dark">{deal.titulo}</td>
+                    <td className="px-5 py-3.5 text-text-gray">{stage?.label ?? deal.stageId}</td>
+                    <td className="px-5 py-3.5 text-text-gray">{deal.responsavel}</td>
+                    <td className="px-5 py-3.5 font-mono font-semibold text-text-dark">
+                      {formatBRL(deal.valor)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        title={
+                          temAtividade === undefined
+                            ? "Verificando..."
+                            : temAtividade
+                              ? "Tem atividade registrada"
+                              : "Sem atividade registrada"
+                        }
+                        className={`inline-block h-2 w-2 rounded-full ${
+                          temAtividade === undefined
+                            ? "bg-border"
+                            : temAtividade
+                              ? "bg-badge-green-text"
+                              : "bg-badge-red-text"
+                        }`}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+              {dealsFiltrados.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-text-faint">
+                    Nenhum negócio encontrado com esses filtros.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : (
       <DndContext
         key={funnelId}
@@ -243,7 +425,8 @@ export default function FunnelBoard() {
               key={stage.id}
               stageId={stage.id}
               label={stage.label}
-              deals={dealsByStage.get(stage.id) ?? []}
+              deals={dealsByStageFiltrado.get(stage.id) ?? []}
+              atividadesStatus={atividadesStatus}
               onOpenDeal={setOpenDealId}
             />
           ))}

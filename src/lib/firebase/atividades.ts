@@ -13,6 +13,24 @@ export async function fetchAtividades(dealId: string): Promise<Atividade[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Atividade, "id">) }));
 }
 
+/**
+ * Verifica, para uma lista de negócios, quais já têm ao menos uma atividade
+ * registrada. Usado pelo indicador verde/vermelho no card do Funil.
+ * Faz uma leitura por negócio (subcoleção), em paralelo — evita depender de
+ * collectionGroup query (que exigiria criar um índice composto no Firestore).
+ */
+export async function checarAtividadesPorDeals(
+  dealIds: string[]
+): Promise<Record<string, boolean>> {
+  const entries = await Promise.all(
+    dealIds.map(async (dealId) => {
+      const snap = await getDocs(atividadesRef(dealId));
+      return [dealId, !snap.empty] as const;
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
 export async function addAtividade(
   dealId: string,
   dados: Omit<Atividade, "id" | "criadoEm" | "concluida">
