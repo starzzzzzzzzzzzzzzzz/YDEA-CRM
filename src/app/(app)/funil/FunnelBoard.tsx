@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus, Filter, LayoutGrid, List, Download, Info, X } from "lucide-react";
+import { Plus, Filter, LayoutGrid, List, Download, Info, X, CalendarCheck2, CalendarX2 } from "lucide-react";
 import { Deal, FunnelId } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
 import { useCrmData } from "@/lib/store/CrmDataContext";
@@ -38,6 +38,36 @@ function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function AtividadeIcone({ temAtividade }: { temAtividade?: boolean }) {
+  if (temAtividade === undefined) {
+    return (
+      <span
+        title="Verificando atividades..."
+        className="h-3.5 w-3.5 rounded-full bg-border shrink-0 mt-0.5"
+      />
+    );
+  }
+  return temAtividade ? (
+    <CalendarCheck2
+      size={17}
+      strokeWidth={2.25}
+      className="text-badge-green-text shrink-0 mt-0.5"
+      aria-label="Tem atividade registrada"
+    >
+      <title>Tem atividade registrada</title>
+    </CalendarCheck2>
+  ) : (
+    <CalendarX2
+      size={17}
+      strokeWidth={2.25}
+      className="text-badge-red-text shrink-0 mt-0.5"
+      aria-label="Sem atividade registrada"
+    >
+      <title>Sem atividade registrada</title>
+    </CalendarX2>
+  );
+}
+
 function DealCard({
   deal,
   dragging,
@@ -46,10 +76,11 @@ function DealCard({
 }: {
   deal: Deal;
   dragging?: boolean;
-  /** true = tem atividade registrada (verde); false = nenhuma (vermelho); undefined = ainda carregando */
+  /** true = tem atividade registrada (calendário verde); false = nenhuma (calendário vermelho); undefined = ainda carregando */
   temAtividade?: boolean;
   onOpen?: (id: string) => void;
 }) {
+  const { getOrganizacao, getPessoa } = useCrmData();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: deal.id,
   });
@@ -57,6 +88,7 @@ function DealCard({
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
   const avatar = avatarStyle(deal.responsavel);
+  const subtitulo = getOrganizacao(deal.organizacaoId)?.nome ?? getPessoa(deal.pessoaId)?.nome;
 
   return (
     <div
@@ -69,39 +101,27 @@ function DealCard({
         isDragging && !dragging ? "opacity-30" : ""
       } ${dragging ? "shadow-md rotate-1" : "hover:border-brand"} transition-colors`}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="flex items-start justify-between gap-2 mb-1">
         <h4 className="font-semibold text-text-dark text-[13px] leading-snug">
           {deal.titulo}
         </h4>
-        <span
-          title={
-            temAtividade === undefined
-              ? "Verificando atividades..."
-              : temAtividade
-                ? "Tem atividade registrada"
-                : "Sem atividade registrada"
-          }
-          className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-            temAtividade === undefined
-              ? "bg-border"
-              : temAtividade
-                ? "bg-badge-green-text"
-                : "bg-badge-red-text"
-          }`}
-        />
+        <AtividadeIcone temAtividade={temAtividade} />
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <div
-            className="h-5 w-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0"
-            style={{ background: avatar.bg, color: avatar.text }}
-          >
-            {deal.responsavel}
-          </div>
-          <span className="text-[12px] font-medium text-text-dark">
-            {formatBRL(deal.valor)}
-          </span>
+      {subtitulo && (
+        <p className="text-[11.5px] font-medium text-brand-strong italic truncate mb-2.5">
+          {subtitulo}
+        </p>
+      )}
+      <div className="flex items-center gap-1.5 mt-0.5">
+        <div
+          className="h-5 w-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0"
+          style={{ background: avatar.bg, color: avatar.text }}
+        >
+          {deal.responsavel}
         </div>
+        <span className="text-[12px] font-semibold text-text-dark">
+          {formatBRL(deal.valor)}
+        </span>
       </div>
     </div>
   );
@@ -168,6 +188,34 @@ export default function FunnelBoard() {
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
   const [atividadesStatus, setAtividadesStatus] = useState<Record<string, boolean>>({});
+
+  // Abrir um negócio registra um passo no histórico do navegador, para que o
+  // botão "voltar" (ou o X do painel) retorne ao funil exatamente como estava
+  // — mesmo funil, filtro e modo de visão — em vez de voltar ao início.
+  function abrirDeal(id: string) {
+    if (typeof window !== "undefined") {
+      window.history.pushState({ dealAberto: id }, "", window.location.href);
+    }
+    setOpenDealId(id);
+  }
+
+  function fecharDeal() {
+    if (typeof window !== "undefined" && window.history.state?.dealAberto) {
+      window.history.back();
+    } else {
+      setOpenDealId(null);
+    }
+  }
+
+  useEffect(() => {
+    function handlePopState(event: PopStateEvent) {
+      if (!event.state?.dealAberto) {
+        setOpenDealId(null);
+      }
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -372,7 +420,7 @@ export default function FunnelBoard() {
                 return (
                   <tr
                     key={deal.id}
-                    onClick={() => setOpenDealId(deal.id)}
+                    onClick={() => abrirDeal(deal.id)}
                     className="border-b border-border-soft last:border-0 hover:bg-panel-bg/60 cursor-pointer transition-colors"
                   >
                     <td className="px-5 py-3.5 font-medium text-text-dark">{deal.titulo}</td>
@@ -382,22 +430,7 @@ export default function FunnelBoard() {
                       {formatBRL(deal.valor)}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span
-                        title={
-                          temAtividade === undefined
-                            ? "Verificando..."
-                            : temAtividade
-                              ? "Tem atividade registrada"
-                              : "Sem atividade registrada"
-                        }
-                        className={`inline-block h-2 w-2 rounded-full ${
-                          temAtividade === undefined
-                            ? "bg-border"
-                            : temAtividade
-                              ? "bg-badge-green-text"
-                              : "bg-badge-red-text"
-                        }`}
-                      />
+                      <AtividadeIcone temAtividade={temAtividade} />
                     </td>
                   </tr>
                 );
@@ -427,7 +460,7 @@ export default function FunnelBoard() {
               label={stage.label}
               deals={dealsByStageFiltrado.get(stage.id) ?? []}
               atividadesStatus={atividadesStatus}
-              onOpenDeal={setOpenDealId}
+              onOpenDeal={abrirDeal}
             />
           ))}
         </div>
@@ -449,8 +482,8 @@ export default function FunnelBoard() {
       {openDealId && (
         <DealDetailPanel
           dealId={openDealId}
-          onClose={() => setOpenDealId(null)}
-          onOpenDeal={setOpenDealId}
+          onClose={fecharDeal}
+          onOpenDeal={abrirDeal}
         />
       )}
     </div>
