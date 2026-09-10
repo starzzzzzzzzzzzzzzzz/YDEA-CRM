@@ -48,6 +48,13 @@ export type Usuario = {
   email: string;
   iniciais: string;
   cargoId: CargoId;
+  /** Campos opcionais de perfil — nem todo usuário antigo tem isso preenchido ainda. */
+  sobrenome?: string;
+  telefone?: string;
+  /** URL da foto de perfil no Firebase Storage (usuarios/{uid}/foto). */
+  fotoUrl?: string;
+  /** Unidade/franquia à qual o usuário pertence — ver lib/db/unidades.ts. */
+  unidadeId?: string;
 };
 
 export type DashboardWidget = {

@@ -19,6 +19,8 @@ type AuthContextValue = {
   error: string | null;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Atualiza o usuário em memória (usado após editar o perfil), sem esperar o próximo snapshot do Firestore. */
+  atualizarUsuarioLocal: (patch: Partial<Usuario>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -64,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: usuarioDoc.email,
           iniciais: usuarioDoc.iniciais,
           cargoId: usuarioDoc.cargoId,
+          sobrenome: usuarioDoc.sobrenome,
+          telefone: usuarioDoc.telefone,
+          fotoUrl: usuarioDoc.fotoUrl,
+          unidadeId: usuarioDoc.unidadeId,
         });
       } catch (err) {
         console.error("Erro ao carregar usuário do Firestore:", err);
@@ -93,8 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut(auth);
   }
 
+  function atualizarUsuarioLocal(patch: Partial<Usuario>) {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, logout, atualizarUsuarioLocal }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "./config";
 import { CargoId } from "@/lib/types";
+import { stripUndefined } from "./utils";
 
 /**
  * Documento da coleção `usuarios` no Firestore.
@@ -15,6 +16,10 @@ export type UsuarioDoc = {
   email: string;
   iniciais: string;
   cargoId: CargoId;
+  sobrenome?: string;
+  telefone?: string;
+  fotoUrl?: string;
+  unidadeId?: string;
 };
 
 export async function fetchUsuario(uid: string): Promise<UsuarioDoc | null> {
@@ -30,4 +35,12 @@ export async function fetchAllUsuarios(): Promise<(UsuarioDoc & { id: string })[
 /** Admin muda o cargo de alguém. */
 export async function atualizarCargoUsuario(usuarioId: string, cargoId: CargoId): Promise<void> {
   await updateDoc(doc(db, "usuarios", usuarioId), { cargoId });
+}
+
+/** Campos que o próprio usuário pode editar no "Configurações de perfil". */
+export type PerfilEditavel = Partial<Pick<UsuarioDoc, "nome" | "sobrenome" | "telefone" | "fotoUrl">>;
+
+/** Usuário edita os próprios dados (nome, sobrenome, telefone, foto) — cargo fica de fora, só admin mexe. */
+export async function atualizarPerfilUsuario(usuarioId: string, patch: PerfilEditavel): Promise<void> {
+  await updateDoc(doc(db, "usuarios", usuarioId), stripUndefined(patch));
 }
