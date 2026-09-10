@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./config";
+import { stripUndefined } from "./utils";
 import { Cliente } from "@/lib/types";
 
 const COLLECTION = "clientes";
@@ -36,11 +37,11 @@ async function nextCodigo(): Promise<string> {
 export async function createCliente(dados: Omit<Cliente, "id" | "codigo" | "createdAt">): Promise<Cliente> {
   const codigo = await nextCodigo();
   const createdAt = new Date().toISOString().slice(0, 10);
-  const payload = { ...dados, codigo, createdAt, _createdAt: serverTimestamp() };
+  const payload = stripUndefined({ ...dados, codigo, createdAt, _createdAt: serverTimestamp() });
   const ref = await addDoc(collection(db, COLLECTION), payload);
   return { id: ref.id, ...dados, codigo, createdAt };
 }
 
 export async function updateCliente(id: string, patch: Partial<Cliente>): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), patch);
+  await updateDoc(doc(db, COLLECTION, id), stripUndefined(patch));
 }

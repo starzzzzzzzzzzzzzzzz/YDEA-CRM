@@ -11,6 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./config";
+import { stripUndefined } from "./utils";
 import { Deal } from "@/lib/types";
 
 const COLLECTION = "deals";
@@ -28,13 +29,13 @@ export async function fetchDeal(id: string): Promise<Deal | null> {
 
 export async function createDeal(dados: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
   const createdAt = new Date().toISOString().slice(0, 10);
-  const payload = { ...dados, createdAt, _createdAt: serverTimestamp() };
+  const payload = stripUndefined({ ...dados, createdAt, _createdAt: serverTimestamp() });
   const ref = await addDoc(collection(db, COLLECTION), payload);
   return { id: ref.id, ...dados, createdAt };
 }
 
 export async function updateDealDoc(id: string, patch: Partial<Deal>): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), patch);
+  await updateDoc(doc(db, COLLECTION, id), stripUndefined(patch));
 }
 
 export async function deleteDeal(id: string): Promise<void> {

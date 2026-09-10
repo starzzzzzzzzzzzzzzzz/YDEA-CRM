@@ -4,7 +4,22 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
-## v6 — Funil/Negócios 100% real (Firestore) — *versão atual*
+## v6.1 — Correção: cliente/negócio não salvava com campos em branco
+
+**Bug:** ao salvar um cliente (ou negócio) com algum campo opcional em branco
+(ex.: "Nome fantasia" vazio), o Firestore recusava a gravação com o erro
+`Function addDoc() called with invalid data. Unsupported field value: undefined`.
+O Firestore não aceita `undefined` em nenhum campo — só aceita quando o campo
+simplesmente não existe.
+
+**Correção:** toda escrita no Firestore (criar/editar cliente, negócio ou
+atividade) agora passa por um filtro (`lib/firebase/utils.ts`) que remove os
+campos vazios antes de gravar. Não muda nada na tela, só no que é enviado por
+baixo dos panos.
+
+---
+
+## v6 — Funil/Negócios 100% real (Firestore)
 
 **O que esta versão faz:**
 - O Kanban do Funil lê e grava negócios de verdade no Firestore — arrastar um card entre etapas persiste.

@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
 import { db } from "./config";
+import { stripUndefined } from "./utils";
 import { Atividade } from "@/lib/types";
 
 function atividadesRef(dealId: string) {
@@ -18,7 +19,7 @@ export async function addAtividade(
 ): Promise<Atividade> {
   const criadoEm = new Date().toISOString();
   const payload = { ...dados, concluida: false, criadoEm };
-  const ref = await addDoc(atividadesRef(dealId), payload);
+  const ref = await addDoc(atividadesRef(dealId), stripUndefined(payload));
   return { id: ref.id, ...payload };
 }
 
