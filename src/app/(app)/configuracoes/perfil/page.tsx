@@ -78,7 +78,7 @@ export default function ConfiguracoesPerfilPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl mx-auto">
       <h1 className="font-display font-bold text-xl text-text-dark mb-1">Configurações de perfil</h1>
       <p className="text-[13px] text-text-gray mb-6">
         Seus dados pessoais dentro do CRM — visíveis pra sua equipe nos negócios e atividades.
