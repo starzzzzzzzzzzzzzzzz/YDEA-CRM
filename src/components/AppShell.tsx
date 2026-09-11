@@ -184,7 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 ml-auto">
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
               className="flex items-center gap-2.5 pl-2 border-l border-border"

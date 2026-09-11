@@ -8,7 +8,45 @@ import { useToast } from "@/components/ui/Toast";
 import { Field, inputClass, SectionTitle } from "@/components/ui/Field";
 import { CARGOS } from "@/lib/db/cargos";
 import { atualizarPerfilUsuario } from "@/lib/firebase/firestore";
-import { uploadFotoPerfil } from "@/lib/firebase/storage";
+
+/**
+ * Redimensiona a imagem no próprio navegador (lado maior = 256px) e comprime
+ * como JPEG antes de virar um data URL. Assim a foto cabe tranquilamente num
+ * campo do Firestore (limite de 1MB por documento) sem precisar do Firebase
+ * Storage — que hoje exige plano pago (Blaze) mesmo pra uso pequeno.
+ */
+function resizeImageToDataUrl(file: File, maxSize = 256, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height >= width && height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas não suportado neste navegador."));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 /**
  * "Configurações de perfil" — igual a "Informações gerais" da referência:
@@ -41,10 +79,10 @@ export default function ConfiguracoesPerfilPage() {
     if (!file) return;
     setUploadingFoto(true);
     try {
-      const url = await uploadFotoPerfil(currentUser.id, file);
-      setFotoUrl(url);
+      const dataUrl = await resizeImageToDataUrl(file);
+      setFotoUrl(dataUrl);
     } catch (err) {
-      console.error("Erro ao subir foto de perfil:", err);
+      console.error("Erro ao processar foto de perfil:", err);
       showToast("Não foi possível enviar a imagem. Tente de novo.", "error");
     } finally {
       setUploadingFoto(false);
