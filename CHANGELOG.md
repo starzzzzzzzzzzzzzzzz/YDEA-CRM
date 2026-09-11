@@ -4,6 +4,39 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v7 — Menu de conta (dropdown do usuário) + tema claro/escuro
+
+**O que esta versão faz:**
+- O botão do usuário no topo agora mostra "Unidade: {nome da unidade}" embaixo do nome.
+- Clicar nele abre um dropdown completo, igual ao de referência que foi passado por print:
+  - Cabeçalho com foto (ou iniciais), nome e unidade.
+  - "Logado como" (e-mail) e "Perfil de usuário" (cargo).
+  - "Unidade" com um seletor — hoje só existe uma unidade cadastrada ("Ydea Energia Solar"), então o campo fica desabilitado, mas já está pronto pra quando existir mais de uma.
+  - "ID de suporte" (com botão de copiar) e "Versão" lado a lado.
+  - Link para a nova página **Configurações de perfil**.
+  - "Acesso e segurança" (item desabilitado, "Em breve" — combinado que ficaria de fora desta entrega).
+  - "Ativar tema claro" / "Ativar tema escuro" — alterna o app inteiro entre os dois temas.
+  - "Sair", como já era.
+- Nova página **/configuracoes/perfil**: edita foto de perfil (upload real pro Storage), nome, sobrenome e telefone. E-mail fica bloqueado (é o login). "Perfil de permissão" aparece só-leitura, com aviso de que quem define é o admin pela página Equipe.
+- Tema escuro em todo o app, ativado pelo botão do dropdown, persistido no navegador (localStorage).
+
+**O que mudou desde a v6.1:**
+- `lib/types.ts`: `Usuario` ganhou `sobrenome`, `telefone`, `fotoUrl` e `unidadeId` (todos opcionais).
+- `lib/firebase/firestore.ts`: `UsuarioDoc` com os mesmos campos novos + função `atualizarPerfilUsuario()`.
+- `lib/firebase/storage.ts`: nova função `uploadFotoPerfil()`.
+- `lib/store/AuthContext.tsx`: carrega os campos novos e expõe `atualizarUsuarioLocal()`.
+- Novos arquivos: `lib/db/unidades.ts`, `lib/version.ts`, `lib/support-id.ts`, `lib/store/ThemeContext.tsx`, `app/(app)/configuracoes/perfil/page.tsx`.
+- `app/globals.css`: bloco `[data-theme="dark"]` com as variáveis do tema escuro.
+- `app/layout.tsx`: `ThemeProvider` plugado por fora do `AuthProvider`.
+
+**O que ficou de fora (combinado, pra depois):**
+- Página "Acesso e segurança" (o item já existe no menu, mas desabilitado).
+- Trocar e-mail de login pela página de perfil (mexe em Firebase Auth).
+- Fluxo de trocar de unidade de verdade — só existe 1 unidade cadastrada hoje, então o seletor no dropdown não tem o que fazer ainda.
+- A rota morta `funil/[id]` continua com os mesmos erros de tipo que já tinha antes desta entrega (não mexemos nela).
+
+---
+
 ## v6.1 — Correção: cliente/negócio não salvava com campos em branco
 
 **Bug:** ao salvar um cliente (ou negócio) com algum campo opcional em branco
