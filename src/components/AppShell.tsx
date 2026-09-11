@@ -21,11 +21,20 @@ import {
   ChevronDown,
   Plus,
   LogOut,
+  Copy,
+  Check,
+  ShieldCheck,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
+import { useTheme } from "@/lib/store/ThemeContext";
 import { hasPermission } from "@/lib/db/permissoes";
 import { CARGOS } from "@/lib/db/cargos";
+import { UNIDADES, unidadeDoUsuario } from "@/lib/db/unidades";
+import { gerarIdSuporte } from "@/lib/support-id";
+import { APP_VERSION } from "@/lib/version";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, active: true, permissaoId: "menu.dashboard" },
@@ -59,9 +68,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { currentUser } = useCrmData();
   const { logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [idCopiado, setIdCopiado] = useState(false);
   const cargo = CARGOS.find((c) => c.id === currentUser.cargoId);
+  const unidade = unidadeDoUsuario(currentUser);
+  const idSuporte = gerarIdSuporte(currentUser.id);
+
+  function copiarIdSuporte() {
+    navigator.clipboard?.writeText(idSuporte).then(() => {
+      setIdCopiado(true);
+      setTimeout(() => setIdCopiado(false), 1500);
+    });
+  }
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -169,12 +189,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => setUserMenuOpen((v) => !v)}
               className="flex items-center gap-2.5 pl-2 border-l border-border"
             >
-              <div className="h-8 w-8 rounded-full bg-brand-soft text-brand-strong font-display font-semibold text-xs flex items-center justify-center">
-                {currentUser.iniciais}
+              <div className="h-8 w-8 rounded-full bg-brand-soft text-brand-strong font-display font-semibold text-xs flex items-center justify-center overflow-hidden">
+                {currentUser.fotoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentUser.fotoUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  currentUser.iniciais
+                )}
               </div>
               <div className="text-left leading-tight hidden sm:block">
                 <div className="text-[13px] font-semibold text-text-dark">{currentUser.nome}</div>
-                <div className="text-[11px] text-text-faint">{cargo?.nome}</div>
+                <div className="text-[11px] text-text-faint">Unidade: {unidade.nome}</div>
               </div>
               <ChevronDown size={14} className="text-text-faint" />
             </button>
@@ -182,21 +207,113 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {userMenuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-card-bg shadow-lg z-40 overflow-hidden animate-dropdown-in">
+                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-border bg-card-bg shadow-lg z-40 overflow-hidden animate-dropdown-in">
+                  {/* Cabeçalho: avatar + nome + unidade */}
                   <div className="px-3.5 py-3 border-b border-border-soft flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-full bg-brand-soft text-brand-strong font-display font-semibold text-xs flex items-center justify-center shrink-0">
-                      {currentUser.iniciais}
+                    <div className="h-9 w-9 rounded-full bg-brand-soft text-brand-strong font-display font-semibold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                      {currentUser.fotoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={currentUser.fotoUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        currentUser.iniciais
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[12.5px] font-medium text-text-dark truncate">{currentUser.nome}</p>
-                      <p className="text-[11px] text-text-faint truncate">{currentUser.email}</p>
+                      <p className="text-[11px] text-text-faint truncate">Unidade: {unidade.nome}</p>
                     </div>
                   </div>
+
+                  {/* Logado como / Perfil de usuário */}
+                  <div className="px-3.5 py-3 border-b border-border-soft space-y-2.5">
+                    <div>
+                      <p className="text-[10.5px] font-semibold text-text-faint uppercase tracking-wide mb-0.5">
+                        Logado como
+                      </p>
+                      <p className="text-[12.5px] text-text-dark truncate">{currentUser.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10.5px] font-semibold text-text-faint uppercase tracking-wide mb-0.5">
+                        Perfil de usuário
+                      </p>
+                      <p className="text-[12.5px] text-text-dark">{cargo?.nome ?? currentUser.cargoId}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10.5px] font-semibold text-text-faint uppercase tracking-wide mb-1">
+                        Unidade
+                      </p>
+                      {/* Só existe 1 unidade cadastrada hoje — o select já fica pronto pra quando existir mais de uma. */}
+                      <select
+                        value={unidade.id}
+                        disabled={UNIDADES.length <= 1}
+                        onChange={() => {}}
+                        className="w-full text-[12.5px] rounded-lg border border-border bg-panel-bg px-2.5 py-1.5 text-text-dark outline-none focus:border-brand disabled:opacity-70 disabled:cursor-default"
+                      >
+                        {UNIDADES.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ID de suporte / Versão */}
+                  <div className="px-3.5 py-3 border-b border-border-soft grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <p className="text-[10.5px] font-semibold text-text-faint uppercase tracking-wide">
+                          ID de suporte
+                        </p>
+                        <button
+                          onClick={copiarIdSuporte}
+                          title="Copiar ID de suporte"
+                          className="text-text-faint hover:text-text-dark transition-colors"
+                        >
+                          {idCopiado ? <Check size={11} className="text-badge-green-text" /> : <Copy size={11} />}
+                        </button>
+                      </div>
+                      <p className="text-[12.5px] text-text-gray">{idSuporte}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10.5px] font-semibold text-text-faint uppercase tracking-wide mb-0.5">
+                        Versão
+                      </p>
+                      <p className="text-[12.5px] text-text-gray">{APP_VERSION}</p>
+                    </div>
+                  </div>
+
+                  <div className="py-1.5 border-b border-border-soft">
+                    <Link
+                      href="/configuracoes/perfil"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-text-gray hover:bg-panel-bg hover:text-text-dark transition-colors"
+                    >
+                      <Settings size={15} />
+                      Configurações de perfil
+                    </Link>
+                    <button
+                      disabled
+                      title="Em breve"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-text-faint cursor-not-allowed"
+                    >
+                      <ShieldCheck size={15} />
+                      Acesso e segurança
+                    </button>
+                    <button
+                      onClick={toggleTheme}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-text-gray hover:bg-panel-bg hover:text-text-dark transition-colors"
+                    >
+                      {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+                      {theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+                    </button>
+                  </div>
+
                   <div className="py-1.5">
                     <button
                       onClick={handleLogout}
                       disabled={loggingOut}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-text-gray hover:bg-panel-bg hover:text-red-600 transition-colors disabled:opacity-60"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[12.5px] font-medium text-red-600 hover:bg-panel-bg transition-colors disabled:opacity-60"
                     >
                       <LogOut size={15} />
                       {loggingOut ? "Saindo..." : "Sair"}

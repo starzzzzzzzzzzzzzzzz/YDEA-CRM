@@ -20,16 +20,14 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Começa sempre "light" no server (evita mismatch de hidratação) e ajusta
-  // pro que estiver salvo assim que monta no cliente.
-  const [theme, setTheme] = useState<Theme>("light");
-
-  useEffect(() => {
+  // Lê o valor salvo já na primeira renderização do cliente (o guard evita
+  // quebrar durante o SSR, onde `window` não existe). O <html> tem
+  // suppressHydrationWarning porque o server sempre renderiza "light".
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
     const salvo = window.localStorage.getItem(STORAGE_KEY);
-    if (salvo === "dark" || salvo === "light") {
-      setTheme(salvo);
-    }
-  }, []);
+    return salvo === "dark" || salvo === "light" ? salvo : "light";
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
