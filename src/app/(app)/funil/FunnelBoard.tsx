@@ -22,18 +22,6 @@ import FunnelSwitcher from "./FunnelSwitcher";
 import NewDealModal from "./NewDealModal";
 import DealDetailPanel from "./DealDetailPanel";
 
-const AVATAR_COLORS = [
-  { bg: "#fdece3", text: "#d94c1e" },
-  { bg: "#e7f6ec", text: "#2f8a52" },
-  { bg: "#e8f0ff", text: "#2f5fd6" },
-  { bg: "#f5e9fb", text: "#8b3fc9" },
-];
-
-function avatarStyle(initials: string) {
-  const idx = initials.charCodeAt(0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
-}
-
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -43,28 +31,34 @@ function AtividadeIcone({ temAtividade }: { temAtividade?: boolean }) {
     return (
       <span
         title="Verificando atividades..."
-        className="h-3.5 w-3.5 rounded-full bg-border shrink-0 mt-0.5"
+        className="h-6 w-6 rounded-lg bg-panel-bg shrink-0"
       />
     );
   }
   return temAtividade ? (
-    <CalendarCheck2
-      size={17}
-      strokeWidth={2.25}
-      className="text-badge-green-text shrink-0 mt-0.5"
-      aria-label="Tem atividade registrada"
+    <span
+      title="Tem atividade registrada"
+      className="h-6 w-6 rounded-lg bg-badge-green-bg flex items-center justify-center shrink-0"
     >
-      <title>Tem atividade registrada</title>
-    </CalendarCheck2>
+      <CalendarCheck2
+        size={14}
+        strokeWidth={2.25}
+        className="text-badge-green-text"
+        aria-label="Tem atividade registrada"
+      />
+    </span>
   ) : (
-    <CalendarX2
-      size={17}
-      strokeWidth={2.25}
-      className="text-badge-red-text shrink-0 mt-0.5"
-      aria-label="Sem atividade registrada"
+    <span
+      title="Sem atividade registrada"
+      className="h-6 w-6 rounded-lg bg-badge-red-bg flex items-center justify-center shrink-0"
     >
-      <title>Sem atividade registrada</title>
-    </CalendarX2>
+      <CalendarX2
+        size={14}
+        strokeWidth={2.25}
+        className="text-badge-red-text"
+        aria-label="Sem atividade registrada"
+      />
+    </span>
   );
 }
 
@@ -87,7 +81,6 @@ function DealCard({
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
-  const avatar = avatarStyle(deal.responsavel);
   const subtitulo = getOrganizacao(deal.organizacaoId)?.nome ?? getPessoa(deal.pessoaId)?.nome;
 
   return (
@@ -97,31 +90,21 @@ function DealCard({
       {...listeners}
       {...attributes}
       onClick={() => onOpen?.(deal.id)}
-      className={`bg-card-bg border border-border rounded-lg px-3.5 py-3 cursor-grab active:cursor-grabbing select-none touch-none ${
+      className={`bg-card-bg border border-border-soft rounded-xl px-3.5 py-3 shadow-sm cursor-grab active:cursor-grabbing select-none touch-none ${
         isDragging && !dragging ? "opacity-30" : ""
-      } ${dragging ? "shadow-md rotate-1" : "hover:border-brand"} transition-colors`}
+      } ${dragging ? "shadow-lg rotate-1" : "hover:border-brand hover:shadow-md"} transition-all`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <h4 className="font-semibold text-text-dark text-[13px] leading-snug">
-          {deal.titulo}
-        </h4>
-        <AtividadeIcone temAtividade={temAtividade} />
-      </div>
-      {subtitulo && (
-        <p className="text-[11.5px] font-medium text-brand-strong italic truncate mb-2.5">
-          {subtitulo}
-        </p>
-      )}
-      <div className="flex items-center gap-1.5 mt-0.5">
-        <div
-          className="h-5 w-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0"
-          style={{ background: avatar.bg, color: avatar.text }}
-        >
-          {deal.responsavel}
-        </div>
+      <h4 className="font-semibold text-text-dark text-[13px] leading-snug truncate">
+        {deal.titulo}
+      </h4>
+      <p className="text-[11.5px] text-text-faint truncate mt-0.5 mb-2.5 min-h-[15px]">
+        {subtitulo ?? "\u00A0"}
+      </p>
+      <div className="flex items-center justify-between gap-2">
         <span className="text-[12px] font-semibold text-text-dark">
           {formatBRL(deal.valor)}
         </span>
+        <AtividadeIcone temAtividade={temAtividade} />
       </div>
     </div>
   );
@@ -153,7 +136,7 @@ function Column({
       </div>
       <div
         ref={setNodeRef}
-        className={`flex flex-col gap-2 min-h-[140px] rounded-lg p-1 flex-1 transition-colors ${
+        className={`flex flex-col gap-2.5 min-h-[140px] rounded-xl p-1 flex-1 transition-colors ${
           isOver ? "bg-brand-soft" : ""
         }`}
       >
@@ -307,7 +290,7 @@ export default function FunnelBoard() {
             {dealsFiltrados.length} resultados
             <Info size={13} className="text-text-faint" />
           </span>
-          <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          <div className="flex items-center rounded-xl border border-border overflow-hidden">
             <button
               onClick={() => setViewMode("grid")}
               className={`h-9 w-9 flex items-center justify-center transition-colors ${
@@ -332,7 +315,7 @@ export default function FunnelBoard() {
           <div className="relative">
             <button
               onClick={() => setFiltrosAbertos((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm transition-colors ${
+              className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm transition-colors ${
                 filtroResponsavel !== "todos"
                   ? "border-brand text-brand-strong bg-brand-soft"
                   : "border-border text-text-gray hover:text-text-dark"
@@ -345,7 +328,7 @@ export default function FunnelBoard() {
               )}
             </button>
             {filtrosAbertos && (
-              <div className="absolute right-0 top-11 z-20 w-64 rounded-lg border border-border bg-card-bg shadow-lg p-4">
+              <div className="absolute right-0 top-11 z-20 w-64 rounded-xl border border-border bg-card-bg shadow-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-semibold text-text-dark">Filtrar negócios</span>
                   <button
@@ -361,7 +344,7 @@ export default function FunnelBoard() {
                 <select
                   value={filtroResponsavel}
                   onChange={(e) => setFiltroResponsavel(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-sm text-text-dark outline-none focus:border-brand"
+                  className="w-full rounded-xl border border-border bg-panel-bg px-3 py-2 text-sm text-text-dark outline-none focus:border-brand"
                 >
                   <option value="todos">Todos</option>
                   {responsaveis.map((r) => (
@@ -383,12 +366,12 @@ export default function FunnelBoard() {
           </div>
           <button
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
+            className="flex items-center gap-1.5 rounded-xl bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
           >
             <Plus size={16} />
             Novo negócio
           </button>
-          <button className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-text-gray hover:text-text-dark transition-colors">
+          <button className="h-9 w-9 rounded-xl border border-border flex items-center justify-center text-text-gray hover:text-text-dark transition-colors">
             <Download size={14} />
           </button>
         </div>

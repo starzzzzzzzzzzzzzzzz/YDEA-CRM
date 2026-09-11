@@ -1,0 +1,19 @@
+COMMIT MESSAGE SUGERIDA
+========================
+
+feat(funil): redesenha DealCard e corrige navegação do painel de detalhes
+
+- DealCard: layout redesenhado (título, subtítulo com nome da
+  organização/pessoa em destaque, avatar + valor)
+- Indicador de atividade trocado de bolinha colorida para ícone de
+  calendário (CalendarCheck2 verde / CalendarX2 vermelho), igual ao
+  padrão de referência do CRM
+- Mesmo ícone aplicado também na visão em Lista (tabela), mantendo
+  consistência visual entre Grade e Lista
+- Abrir um negócio agora registra um passo no histórico do navegador;
+  fechar o painel (botão X ou "voltar" do navegador/celular) retorna
+  exatamente para o funil como estava — mesmo funil selecionado,
+  filtro de responsável e modo de visão (Grade/Lista) — em vez de
+  resetar para o início
+
+Arquivo alterado: src/app/(app)/funil/FunnelBoard.tsx
