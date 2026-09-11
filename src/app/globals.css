@@ -43,6 +43,11 @@
 }
 
 @theme inline {
+  /* Radius global — "rounded-lg" (padrão antigo) agora renderiza igual ao
+     "rounded-xl" usado no Funil, deixando cards/botões/inputs de todo o
+     app com o mesmo arredondamento, sem precisar trocar classe por classe. */
+  --radius-lg: 0.75rem;
+
   --color-page-bg: var(--page-bg);
   --color-panel-bg: var(--panel-bg);
   --color-card-bg: var(--card-bg);
