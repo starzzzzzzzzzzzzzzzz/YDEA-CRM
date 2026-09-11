@@ -31,3 +31,11 @@ export async function uploadDocumento(
 export async function deleteDocumento(storagePath: string): Promise<void> {
   await deleteObject(ref(storage, storagePath));
 }
+
+/** Sobe a foto de perfil do usuário pra usuarios/{uid}/foto-{timestamp} e devolve a URL pública. */
+export async function uploadFotoPerfil(uid: string, file: File): Promise<string> {
+  const storagePath = `usuarios/${uid}/foto-${Date.now()}-${file.name}`;
+  const storageRef = ref(storage, storagePath);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
