@@ -37,7 +37,8 @@ import {
   TEMPERATURA_LABEL,
 } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
-import { TEAM_MEMBERS, CANAIS_ORIGEM } from "@/lib/mock-team";
+import { CANAIS_ORIGEM } from "@/lib/mock-team";
+import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
 import { maskCurrencyDigits, currencyDigitsToNumber } from "@/lib/masks";
 
 type FormState = {
@@ -120,6 +121,50 @@ function emptyForm(funnel: Funnel): FormState {
   };
 }
 
+/** Reconstrói os campos do formulário a partir de um negócio existente — usado por "Duplicar negócio". */
+function formFromDeal(deal: Deal, funnel: Funnel): FormState {
+  const numToStr = (n?: number) => (n !== undefined ? String(n) : "");
+  return {
+    ...emptyForm(funnel),
+    titulo: `${deal.titulo} (cópia)`,
+    responsavel: deal.responsavel,
+    funnelId: deal.funnelId,
+    stageId: deal.stageId,
+    valorDigits: String(Math.round(deal.valor * 100)),
+    previsaoFechamento: deal.previsaoFechamento ?? "",
+    canalOrigem: deal.canalOrigem ?? "",
+    prioridade: deal.prioridade ?? "media",
+    probabilidade: deal.probabilidade ?? 50,
+    temperatura: deal.temperatura ?? "morno",
+    status: "aberto",
+
+    distribuidora: deal.distribuidora ?? "",
+    contaContrato: deal.contaContrato ?? "",
+    numeroUC: deal.numeroUC ?? "",
+    classeConsumidora: deal.classeConsumidora ?? "",
+    grupoTarifario: deal.grupoTarifario ?? "",
+    modalidadeTarifaria: deal.modalidadeTarifaria ?? "",
+    fase: deal.fase ?? "",
+    tensao: deal.tensao ?? "",
+    consumoMedio: numToStr(deal.consumoMedio),
+    cargaInstalada: numToStr(deal.cargaInstalada),
+    demandaContratada: numToStr(deal.demandaContratada),
+
+    potenciaSistema: numToStr(deal.potenciaSistema),
+    valorProjetoDigits: deal.valorProjeto ? String(Math.round(deal.valorProjeto * 100)) : "",
+    tipoTelhado: deal.tipoTelhado ?? "",
+    estrutura: deal.estrutura ?? "",
+    inclinacao: numToStr(deal.inclinacao),
+    orientacao: deal.orientacao ?? "",
+    area: numToStr(deal.area),
+    drone: deal.drone ?? false,
+    trocaTitularidade: deal.trocaTitularidade ?? false,
+    validadeProposta: deal.validadeProposta ?? "",
+
+    observacoes: deal.observacoes ?? "",
+  };
+}
+
 function CardSection({
   icon,
   title,
@@ -153,17 +198,28 @@ function draftKey(funnelId: string) {
 
 export default function NewDealModal({
   funnel,
+  initialDeal,
   onClose,
   onCreate,
 }: {
   funnel: Funnel;
+  /** Quando informado, o formulário abre pré-preenchido com estes dados — usado por "Duplicar negócio". */
+  initialDeal?: Deal;
   onClose: () => void;
   onCreate: (deal: Omit<Deal, "id" | "createdAt">) => void;
 }) {
   const { showToast } = useToast();
   const { organizacoes, pessoas, addOrganizacao, addPessoa, currentUser } = useCrmData();
+  const [usuarios, setUsuarios] = useState<UsuarioDoc[]>([]);
+
+  useEffect(() => {
+    fetchAllUsuarios()
+      .then(setUsuarios)
+      .catch((err) => console.error("Erro ao carregar equipe do Firestore:", err));
+  }, []);
 
   function loadDraft(): { form?: Partial<FormState>; organizacaoId?: string; pessoaId?: string } | null {
+    if (initialDeal) return null; // duplicando um negócio — não usa rascunho salvo
     try {
       const raw = localStorage.getItem(draftKey(funnel.id));
       return raw ? JSON.parse(raw) : null;
@@ -173,14 +229,20 @@ export default function NewDealModal({
   }
   const [draft] = useState(loadDraft);
 
-  const [organizacao, setOrganizacao] = useState<Organizacao | null>(
-    () => (draft?.organizacaoId && organizacoes.find((o) => o.id === draft.organizacaoId)) || null
-  );
-  const [pessoa, setPessoa] = useState<Pessoa | null>(
-    () => (draft?.pessoaId && pessoas.find((p) => p.id === draft.pessoaId)) || null
-  );
+  const [organizacao, setOrganizacao] = useState<Organizacao | null>(() => {
+    const orgId = initialDeal?.organizacaoId ?? draft?.organizacaoId;
+    return (orgId && organizacoes.find((o) => o.id === orgId)) || null;
+  });
+  const [pessoa, setPessoa] = useState<Pessoa | null>(() => {
+    const pessoaId = initialDeal?.pessoaId ?? draft?.pessoaId;
+    return (pessoaId && pessoas.find((p) => p.id === pessoaId)) || null;
+  });
   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
-  const [form, setForm] = useState<FormState>(() => ({ ...emptyForm(funnel), ...draft?.form }));
+  const [form, setForm] = useState<FormState>(() =>
+    initialDeal
+      ? formFromDeal(initialDeal, funnel)
+      : { ...emptyForm(funnel), responsavel: currentUser.nome, ...draft?.form }
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState<"draft" | "create" | "proposal" | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -206,6 +268,7 @@ export default function NewDealModal({
   }, [draft, showToast]);
 
   function persistDraft() {
+    if (initialDeal) return;
     const payload = { form, organizacaoId: organizacao?.id, pessoaId: pessoa?.id };
     localStorage.setItem(draftKey(funnel.id), JSON.stringify(payload));
     setLastSavedAt(new Date());
@@ -214,6 +277,7 @@ export default function NewDealModal({
   // --- Autosave every 4s while there's meaningful content ---
   useEffect(() => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    if (initialDeal) return; // duplicando — não sobrescreve o rascunho de "novo negócio" desse funil
     if (!form.titulo.trim() && !organizacao && !pessoa) return;
     autosaveTimer.current = setTimeout(persistDraft, 4000);
     return () => {
@@ -256,7 +320,11 @@ export default function NewDealModal({
     }));
   }, [pessoas, organizacao]);
 
-  const responsavelItems: SearchSelectItem[] = TEAM_MEMBERS.map((m) => ({ id: m.id, label: m.nome }));
+  const responsavelItems: SearchSelectItem[] = useMemo(() => {
+    const nomes = new Set(usuarios.map((u) => u.nome));
+    nomes.add(currentUser.nome);
+    return Array.from(nomes).map((nome) => ({ id: nome, label: nome }));
+  }, [usuarios, currentUser.nome]);
   const canalItems: SearchSelectItem[] = CANAIS_ORIGEM.map((c) => ({ id: c, label: c }));
   const funnelItems: SearchSelectItem[] = FUNNELS.filter((f) =>
     hasPermission(currentUser.cargoId, `funil.${f.id}`)
@@ -282,9 +350,7 @@ export default function NewDealModal({
     return {
       titulo: form.titulo.trim(),
       valor: currencyDigitsToNumber(form.valorDigits),
-      responsavel:
-        TEAM_MEMBERS.find((m) => m.id === form.responsavel)?.iniciais ||
-        form.responsavel.slice(0, 2).toUpperCase(),
+      responsavel: form.responsavel.trim() || currentUser.nome,
       funnelId: form.funnelId,
       stageId: form.stageId,
 
@@ -367,7 +433,8 @@ export default function NewDealModal({
             </button>
             <span className="text-border">/</span>
             <h2 id="deal-modal-title" className="font-display font-semibold text-[15px] text-text-dark truncate">
-              Novo Negócio <span className="text-text-faint font-normal">· {selectedFunnel.name}</span>
+              {initialDeal ? "Duplicar Negócio" : "Novo Negócio"}{" "}
+              <span className="text-text-faint font-normal">· {selectedFunnel.name}</span>
             </h2>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -670,15 +737,17 @@ export default function NewDealModal({
           <button type="button" onClick={onClose} className="rounded-lg px-4 py-2.5 text-sm font-medium text-text-gray hover:bg-panel-bg transition-colors">
             Cancelar
           </button>
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={submitting !== null}
-            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-gray hover:bg-panel-bg transition-colors disabled:opacity-70"
-          >
-            {submitting === "draft" && <Loader2 size={14} className="animate-spin-slow" />}
-            Salvar Rascunho
-          </button>
+          {!initialDeal && (
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={submitting !== null}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-text-gray hover:bg-panel-bg transition-colors disabled:opacity-70"
+            >
+              {submitting === "draft" && <Loader2 size={14} className="animate-spin-slow" />}
+              Salvar Rascunho
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleCreate(false)}

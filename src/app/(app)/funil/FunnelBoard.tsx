@@ -167,6 +167,7 @@ export default function FunnelBoard() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [openDealId, setOpenDealId] = useState<string | null>(null);
+  const [duplicatingDeal, setDuplicatingDeal] = useState<Deal | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
@@ -273,6 +274,27 @@ export default function FunnelBoard() {
   async function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">) {
     await addDeal(newDeal);
     setModalOpen(false);
+  }
+
+  function handleDuplicateRequest(deal: Deal) {
+    fecharDeal();
+    setDuplicatingDeal(deal);
+  }
+
+  async function handleCreateDuplicate(newDeal: Omit<Deal, "id" | "createdAt">) {
+    const criado = await addDeal(newDeal);
+    // O formulário de "novo negócio" não edita esses campos — copiamos do
+    // original manualmente pra "Duplicar negócio" não perder essa informação.
+    if (duplicatingDeal) {
+      const extras: Partial<Deal> = {};
+      if (duplicatingDeal.perfilCliente) extras.perfilCliente = duplicatingDeal.perfilCliente;
+      if (duplicatingDeal.concessionaria) extras.concessionaria = duplicatingDeal.concessionaria;
+      if (duplicatingDeal.npsVenda !== undefined) extras.npsVenda = duplicatingDeal.npsVenda;
+      if (duplicatingDeal.npsInstalacao !== undefined) extras.npsInstalacao = duplicatingDeal.npsInstalacao;
+      if (duplicatingDeal.npsPosVenda !== undefined) extras.npsPosVenda = duplicatingDeal.npsPosVenda;
+      if (Object.keys(extras).length > 0) updateDeal(criado.id, extras);
+    }
+    setDuplicatingDeal(null);
   }
 
   return (
@@ -462,11 +484,20 @@ export default function FunnelBoard() {
         />
       )}
 
+      {duplicatingDeal && (
+        <NewDealModal
+          funnel={FUNNELS.find((f) => f.id === duplicatingDeal.funnelId) ?? funnel}
+          initialDeal={duplicatingDeal}
+          onClose={() => setDuplicatingDeal(null)}
+          onCreate={handleCreateDuplicate}
+        />
+      )}
+
       {openDealId && (
         <DealDetailPanel
           dealId={openDealId}
           onClose={fecharDeal}
-          onOpenDeal={abrirDeal}
+          onDuplicate={handleDuplicateRequest}
         />
       )}
     </div>

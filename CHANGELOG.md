@@ -4,6 +4,26 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v8 — Responsável real + Duplicar negócio abre formulário preenchido
+
+**O que esta versão faz:**
+- **Responsável, no formulário de "Novo negócio":** deixou de ser uma lista fixa no código (`TEAM_MEMBERS`) e passou a buscar a equipe de verdade no Firestore. O campo já vem **pré-selecionado com quem está logado**, podendo trocar pra qualquer outro colega cadastrado.
+- **Responsável agora é salvo como nome completo** (ex.: "Sergio Borges"), igual ao que a troca de responsável no detalhe do negócio já fazia — antes o formulário de criação salvava só as iniciais (ex.: "SB"), o que também causava aquele avatar quebrado/esticado que apareceu num dos prints.
+- **"Duplicar negócio"** deixou de criar uma cópia silenciosa direto no Firestore. Agora ele fecha o negócio aberto e abre o formulário de "Novo Negócio" **pré-preenchido** com todos os dados do original (valor, funil, etapa, responsável, dados técnicos, etc.) — o título já vem como "Nome (cópia)" — pra você revisar/alterar antes de confirmar, igual ao comportamento do CRM de referência.
+  - Campos que o formulário de criação não edita (Perfil do cliente, Concessionária, NPS Venda/Instalação/Pós-venda) são copiados do original por baixo dos panos, pra não se perderem.
+  - Anotações e Atividades continuam não sendo copiadas (são específicas de cada negócio).
+
+**O que mudou por baixo:**
+- `NewDealModal.tsx`: novo prop `initialDeal?: Deal`; nova função `formFromDeal()` que reconstrói o formulário a partir de um negócio existente; rascunho automático (autosave) desativado nesse modo.
+- `DealDetailPanel.tsx`: `handleDuplicar` agora só sinaliza pro Funil abrir o formulário (não chama mais `duplicateDeal` do Firestore diretamente).
+- `FunnelBoard.tsx`: novo estado `duplicatingDeal` e função `handleCreateDuplicate`.
+- Removido de novo o código morto em `/funil/[id]` e os mocks `mock-deals.ts`/`mock-deal-details.ts` — essa remoção de uma entrega anterior não tinha chegado a ser enviada pro repositório.
+
+**O que ainda falta (conhecido, não é bug):**
+- Propostas, Financiamentos e importação do SolarZ continuam pendentes, como já registrado.
+
+---
+
 ## v7 — Menu de conta (dropdown do usuário) + tema claro/escuro
 
 **O que esta versão faz:**

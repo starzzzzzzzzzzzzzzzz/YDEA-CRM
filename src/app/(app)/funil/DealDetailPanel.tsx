@@ -19,7 +19,6 @@ import {
   Copy,
   Trash2,
   Download,
-  Loader2,
   Plus,
 } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
@@ -33,6 +32,7 @@ import {
   AtividadeTipo,
   ATIVIDADE_TIPO_LABEL,
   DealPrioridade,
+  Deal,
 } from "@/lib/types";
 import { formatBRL } from "@/lib/masks";
 import RichTextEditor from "@/components/ui/RichTextEditor";
@@ -91,13 +91,14 @@ function SidebarCard({
 export default function DealDetailPanel({
   dealId,
   onClose,
-  onOpenDeal,
+  onDuplicate,
 }: {
   dealId: string;
   onClose: () => void;
-  onOpenDeal?: (id: string) => void;
+  /** Fecha o painel e abre o formulário de "Novo negócio" pré-preenchido com estes dados. */
+  onDuplicate?: (deal: Deal) => void;
 }) {
-  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal, duplicateDeal } = useCrmData();
+  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal } = useCrmData();
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -113,7 +114,6 @@ export default function DealDetailPanel({
   const [motivoPerdaAberto, setMotivoPerdaAberto] = useState(false);
   const [motivoPerda, setMotivoPerda] = useState("");
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
-  const [duplicando, setDuplicando] = useState(false);
 
   const [anotacoes, setAnotacoes] = useState<Anotacao[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
@@ -198,19 +198,9 @@ export default function DealDetailPanel({
     setMenuOpen(false);
   }
 
-  async function handleDuplicar() {
-    setDuplicando(true);
-    try {
-      const copia = await duplicateDeal(deal!);
-      showToast("Negócio duplicado");
-      setMenuOpen(false);
-      onOpenDeal?.(copia.id);
-    } catch (err) {
-      console.error(err);
-      showToast("Não foi possível duplicar o negócio", "info");
-    } finally {
-      setDuplicando(false);
-    }
+  function handleDuplicar() {
+    setMenuOpen(false);
+    onDuplicate?.(deal!);
   }
 
   async function handleExcluir() {
@@ -361,10 +351,9 @@ export default function DealDetailPanel({
                     </button>
                     <button
                       onClick={handleDuplicar}
-                      disabled={duplicando}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] text-text-gray hover:bg-panel-bg transition-colors disabled:opacity-60"
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] text-text-gray hover:bg-panel-bg transition-colors"
                     >
-                      {duplicando ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
+                      <Copy size={14} />
                       Duplicar negócio
                     </button>
                     <button
