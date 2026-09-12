@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { STATUS_LABEL, TEMPERATURA_LABEL, CLIENTE_STATUS_STYLE } from "@/lib/types";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useState } from "react";
@@ -29,7 +29,7 @@ export default function ClientesPage() {
         </div>
         <Link
           href="/clientes/novo"
-          className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
+          className="btn-press flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
         >
           <Plus size={16} />
           Novo cliente
@@ -62,16 +62,47 @@ export default function ClientesPage() {
             </tr>
           </thead>
           <tbody>
-            {clientesLoading && (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-text-faint">
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={15} className="animate-spin" />
-                    Carregando clientes do Firestore...
-                  </span>
-                </td>
-              </tr>
-            )}
+            {clientesLoading &&
+              [0, 1, 2, 3, 4, 5].map((row) => (
+                <tr key={row} className="border-b border-border-soft last:border-0">
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-3 w-14 rounded animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-3.5 w-32 rounded animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-3 w-20 rounded animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-3 w-24 rounded animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-3 w-16 rounded animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div
+                      className="h-5 w-20 rounded-md animate-skeleton bg-border-soft"
+                      style={{ animationDelay: `${row * 60}ms` }}
+                    />
+                  </td>
+                </tr>
+              ))}
             {!clientesLoading &&
               filtrados.map((c) => (
                 <tr

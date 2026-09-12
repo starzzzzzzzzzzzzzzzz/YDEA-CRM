@@ -62,6 +62,12 @@ function AtividadeIcone({ temAtividade }: { temAtividade?: boolean }) {
   );
 }
 
+const PRIORIDADE_ACCENT: Record<string, string> = {
+  baixa: "bg-border",
+  media: "bg-amber-400",
+  alta: "bg-red-500",
+};
+
 function DealCard({
   deal,
   dragging,
@@ -83,6 +89,13 @@ function DealCard({
     : undefined;
   const subtitulo = getOrganizacao(deal.organizacaoId)?.nome ?? getPessoa(deal.pessoaId)?.nome;
 
+  const accentColor =
+    deal.status === "ganho"
+      ? "bg-badge-green-text"
+      : deal.status === "perdido"
+      ? "bg-badge-red-text"
+      : PRIORIDADE_ACCENT[deal.prioridade ?? "media"] ?? PRIORIDADE_ACCENT.media;
+
   return (
     <div
       ref={setNodeRef}
@@ -90,10 +103,15 @@ function DealCard({
       {...listeners}
       {...attributes}
       onClick={() => onOpen?.(deal.id)}
-      className={`bg-card-bg border border-border-soft rounded-xl px-3.5 py-3 shadow-sm cursor-grab active:cursor-grabbing select-none touch-none ${
+      className={`group relative overflow-hidden bg-card-bg border border-border-soft rounded-xl pl-4 pr-3.5 py-3 shadow-sm cursor-grab active:cursor-grabbing select-none touch-none transition-all duration-200 ease-out ${
         isDragging && !dragging ? "opacity-30" : ""
-      } ${dragging ? "shadow-lg rotate-1" : "hover:border-brand hover:shadow-md"} transition-all`}
+      } ${
+        dragging
+          ? "shadow-xl rotate-1 scale-[1.02]"
+          : "hover:border-brand hover:shadow-md hover:-translate-y-0.5"
+      }`}
     >
+      <span className={`absolute left-0 top-0 h-full w-1 ${accentColor} transition-colors`} />
       <h4 className="font-semibold text-text-dark text-[13px] leading-snug truncate">
         {deal.titulo}
       </h4>
@@ -388,7 +406,7 @@ export default function FunnelBoard() {
           </div>
           <button
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
+            className="btn-press flex items-center gap-1.5 rounded-xl bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
           >
             <Plus size={16} />
             Novo negócio
@@ -402,9 +420,24 @@ export default function FunnelBoard() {
       <div className="border-b border-border mb-5" />
 
       {dealsLoading ? (
-        <div className="flex items-center justify-center py-16 text-sm text-text-faint gap-2">
-          <span className="h-4 w-4 rounded-full border-2 border-brand border-t-transparent animate-spin" />
-          Carregando negócios do Firestore...
+        <div className="flex gap-4 overflow-hidden">
+          {[0, 1, 2, 3].map((col) => (
+            <div key={col} className="flex flex-col w-72 shrink-0 gap-3">
+              <div className="h-3.5 w-24 rounded animate-skeleton bg-border-soft" />
+              <div className="h-3 w-16 rounded animate-skeleton bg-border-soft" />
+              {[0, 1].map((row) => (
+                <div
+                  key={row}
+                  className="rounded-xl border border-border-soft bg-card-bg p-3.5 space-y-2.5"
+                  style={{ animationDelay: `${(col * 2 + row) * 60}ms` }}
+                >
+                  <div className="h-3.5 w-4/5 rounded animate-skeleton bg-border-soft" />
+                  <div className="h-3 w-2/5 rounded animate-skeleton bg-border-soft" />
+                  <div className="h-3.5 w-1/3 rounded animate-skeleton bg-border-soft" />
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       ) : viewMode === "list" ? (
         <div className="rounded-xl border border-border overflow-hidden bg-card-bg">

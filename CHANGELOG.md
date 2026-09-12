@@ -4,6 +4,27 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v9 — Visual: card do negócio mais rico + animações + skeleton loading
+
+**O que esta versão faz:**
+- **Card do negócio (Kanban):** barra colorida na lateral esquerda — verde quando Ganho, vermelha quando Perdido, ou pela prioridade (cinza/âmbar/vermelho) enquanto em aberto; elevação mais suave ao passar o mouse (sombra + leve "levantada"); ao arrastar, o card ganha uma leve inclinação e escala, com transição mais suave.
+- **Painel de detalhe do negócio:** agora desliza da direita ao abrir, em vez de só aparecer com fade.
+- **Loading states:** Funil e lista de Clientes trocaram o spinner + texto "Carregando..." por um **esqueleto** (skeleton) no formato real do conteúdo (colunas do Kanban / linhas de tabela) enquanto os dados vêm do Firestore.
+- **Feedback de clique:** botões principais ("Novo negócio", "Novo cliente") agora "afundam" sutilmente ao clicar.
+
+**O que mudou por baixo:**
+- `globals.css`: nova animação `panel-in` (slide) e utilitário `.btn-press`.
+- `FunnelBoard.tsx`: `DealCard` com barra de status/prioridade; skeleton do Kanban.
+- `DealDetailPanel.tsx`: troca de `animate-overlay-in` por `animate-panel-in`.
+- `clientes/page.tsx`: skeleton nas linhas da tabela.
+
+**O que ainda falta (próxima entrega de visual, por ordem de prioridade que combinamos):**
+- Layout mais flexível (sidebar retrátil, colunas do funil colapsáveis, densidade de tabela)
+- Dashboard com gráficos animados (crescimento de barras, contadores animados)
+- Estender o feedback de clique e as animações de modal/dropdown pro resto do app (Equipe, Leads, Instalações)
+
+---
+
 ## v8 — Responsável real + Duplicar negócio abre formulário preenchido
 
 **O que esta versão faz:**

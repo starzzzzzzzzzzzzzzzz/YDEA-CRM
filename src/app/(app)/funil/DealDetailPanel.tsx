@@ -241,7 +241,7 @@ export default function DealDetailPanel({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-page-bg flex flex-col animate-overlay-in">
+    <div className="fixed inset-0 z-[100] bg-page-bg flex flex-col animate-panel-in">
       {/* Breadcrumb bar */}
       <div className="flex items-center justify-between px-6 h-12 border-b border-border-soft shrink-0 bg-card-bg">
         <div className="flex items-center gap-1.5 text-[13px] text-text-faint min-w-0">
