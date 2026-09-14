@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/store/AuthContext";
+import { LogoMark } from "@/components/ui/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,8 +39,8 @@ export default function LoginPage() {
     <div className="min-h-screen w-full flex items-center justify-center bg-panel-bg px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="h-11 w-11 rounded-xl bg-brand flex items-center justify-center font-display font-bold text-text-dark text-lg mb-4">
-            Y
+          <div className="h-14 w-14 flex items-center justify-center mb-4">
+            <LogoMark size={52} />
           </div>
           <h1 className="font-display font-semibold text-xl text-text-dark mb-1">
             Ydea Solar CRM

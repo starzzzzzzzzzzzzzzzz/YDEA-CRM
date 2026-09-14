@@ -12,10 +12,10 @@
   --sidebar-bg: #1a1a1a;
   --sidebar-bg-alt: #2c2c2c;
 
-  /* Brand — Verde Lima */
-  --brand: #aadd00;
-  --brand-strong: #8cb800;
-  --brand-soft: #f2ffe0;
+  /* Brand — Ydea (rebranding ago/2026): teal → azul */
+  --brand: #12b6c1;
+  --brand-strong: #1b7cb2;
+  --brand-soft: #e6faf7;
 
   /* Text */
   --text-dark: #1a1a1a;
@@ -89,7 +89,7 @@
   --sidebar-bg: #0f0f0f;
   --sidebar-bg-alt: #1c1c1c;
 
-  --brand-soft: #26330a;
+  --brand-soft: #123330;
 
   --text-dark: #f2f2f2;
   --text-gray: #b3b3b3;

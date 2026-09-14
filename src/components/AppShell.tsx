@@ -27,6 +27,7 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
+import { LogoMark } from "@/components/ui/Logo";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
 import { useTheme } from "@/lib/store/ThemeContext";
@@ -97,8 +98,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex bg-page-bg">
       {/* Sidebar */}
       <aside className="w-16 shrink-0 bg-sidebar-bg border-r border-black/30 flex flex-col items-center py-4">
-        <div className="h-9 w-9 rounded-lg bg-brand flex items-center justify-center font-display font-bold text-text-dark text-sm mb-6">
-          Y
+        <div className="h-9 w-9 flex items-center justify-center mb-6">
+          <LogoMark size={30} />
         </div>
 
         <nav className="flex flex-col items-center gap-1 flex-1">
