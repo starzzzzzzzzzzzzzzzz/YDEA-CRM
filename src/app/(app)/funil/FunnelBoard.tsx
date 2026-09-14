@@ -37,26 +37,26 @@ function AtividadeIcone({ temAtividade }: { temAtividade?: boolean }) {
   }
   return temAtividade ? (
     <span
-      title="Tem atividade registrada"
+      title="Tem atividade pendente"
       className="h-6 w-6 rounded-lg bg-badge-green-bg flex items-center justify-center shrink-0"
     >
       <CalendarCheck2
         size={14}
         strokeWidth={2.25}
         className="text-badge-green-text"
-        aria-label="Tem atividade registrada"
+        aria-label="Tem atividade pendente"
       />
     </span>
   ) : (
     <span
-      title="Sem atividade registrada"
+      title="Sem atividade pendente"
       className="h-6 w-6 rounded-lg bg-badge-red-bg flex items-center justify-center shrink-0"
     >
       <CalendarX2
         size={14}
         strokeWidth={2.25}
         className="text-badge-red-text"
-        aria-label="Sem atividade registrada"
+        aria-label="Sem atividade pendente"
       />
     </span>
   );

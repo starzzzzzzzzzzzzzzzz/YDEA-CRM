@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { db } from "./config";
 import { stripUndefined } from "./utils";
 import { Atividade } from "@/lib/types";
@@ -14,8 +14,10 @@ export async function fetchAtividades(dealId: string): Promise<Atividade[]> {
 }
 
 /**
- * Verifica, para uma lista de negócios, quais já têm ao menos uma atividade
- * registrada. Usado pelo indicador verde/vermelho no card do Funil.
+ * Verifica, para uma lista de negócios, quais têm ao menos uma atividade
+ * PENDENTE (não concluída). Usado pelo indicador verde/vermelho no card do
+ * Funil — verde só enquanto sobrar alguma atividade em aberto; se todas já
+ * foram concluídas, o indicador some/fica vermelho.
  * Faz uma leitura por negócio (subcoleção), em paralelo — evita depender de
  * collectionGroup query (que exigiria criar um índice composto no Firestore).
  */
@@ -24,7 +26,8 @@ export async function checarAtividadesPorDeals(
 ): Promise<Record<string, boolean>> {
   const entries = await Promise.all(
     dealIds.map(async (dealId) => {
-      const snap = await getDocs(atividadesRef(dealId));
+      const q = query(atividadesRef(dealId), where("concluida", "==", false));
+      const snap = await getDocs(q);
       return [dealId, !snap.empty] as const;
     })
   );
