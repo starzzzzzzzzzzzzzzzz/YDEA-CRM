@@ -4,6 +4,24 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v10 — Linha do tempo no negócio + ícone do card sincronizado ao vivo
+
+**O que esta versão faz:**
+- Nova aba **"Linha do tempo"** no detalhe do negócio (agora a primeira aba, antes de Anotações e Atividades) — junta anotações e atividades em ordem cronológica (mais recente primeiro), igual ao modelo de referência que você mandou. Cada evento mostra quem fez, quando, e o conteúdo (anotação escrita, ou a tarefa com tipo/horário e o botão de marcar como concluída). Também mostra um evento de "Negócio criado".
+- Filtros dentro da Linha do tempo: **Todas / Atividades / Anotações**, com contador em cada um.
+- **Corrigido de vez o ícone do calendário no card do Kanban:** antes, marcar ou criar uma atividade só refletia no card depois de recarregar a página ou trocar de funil — agora atualiza na hora.
+
+**O que mudou por baixo:**
+- `DealDetailPanel.tsx`: nova aba e componente `TimelineTab` (mescla `anotacoes` + `atividades` + evento de criação, ordenados por data); novo prop `onAtividadesStatusChange` que avisa o Kanban em tempo real quando a lista de atividades muda.
+- `FunnelBoard.tsx`: conecta esse aviso ao estado `atividadesStatus` que já existia.
+- Removido de novo o código morto em `/funil/[id]` — a exclusão de entregas anteriores ainda não tinha sido de fato commitada no repositório. Se isso continuar voltando, vale conferir se o `git push` está sendo feito depois do `git commit`.
+
+**O que ainda falta (conhecido, não é bug):**
+- "Registros" e "Propostas" (que aparecem no CRM de referência como sub-abas da Linha do tempo) não existem ainda — só incluí Todas/Atividades/Anotações, que é o que já temos de verdade.
+- Layout mais flexível e dashboard com gráficos animados continuam pendentes, como já registrado.
+
+---
+
 ## v9 — Visual: card do negócio mais rico + animações + skeleton loading
 
 **O que esta versão faz:**

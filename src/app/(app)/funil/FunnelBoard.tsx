@@ -531,6 +531,9 @@ export default function FunnelBoard() {
           dealId={openDealId}
           onClose={fecharDeal}
           onDuplicate={handleDuplicateRequest}
+          onAtividadesStatusChange={(id, pendente) =>
+            setAtividadesStatus((prev) => ({ ...prev, [id]: pendente }))
+          }
         />
       )}
     </div>

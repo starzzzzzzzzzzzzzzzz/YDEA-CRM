@@ -92,11 +92,15 @@ export default function DealDetailPanel({
   dealId,
   onClose,
   onDuplicate,
+  onAtividadesStatusChange,
 }: {
   dealId: string;
   onClose: () => void;
   /** Fecha o painel e abre o formulário de "Novo negócio" pré-preenchido com estes dados. */
   onDuplicate?: (deal: Deal) => void;
+  /** Avisa o Kanban quando a situação de "tem atividade pendente" deste negócio muda,
+   * pro card atualizar o ícone na hora, sem esperar um refetch. */
+  onAtividadesStatusChange?: (dealId: string, pendente: boolean) => void;
 }) {
   const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal } = useCrmData();
   const { user } = useAuth();
@@ -106,7 +110,9 @@ export default function DealDetailPanel({
 
   const [notaValue, setNotaValue] = useState("");
   const [salvandoNota, setSalvandoNota] = useState(false);
-  const [abaPrincipal, setAbaPrincipal] = useState<"anotacoes" | "atividades">("anotacoes");
+  const [abaPrincipal, setAbaPrincipal] = useState<"linha_tempo" | "anotacoes" | "atividades">(
+    "linha_tempo"
+  );
   const [showInfoCliente, setShowInfoCliente] = useState(true);
   const [showDocumentos, setShowDocumentos] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -126,6 +132,13 @@ export default function DealDetailPanel({
     fetchAtividades(dealId).then(setAtividades).catch((err) => console.error(err));
     fetchAllUsuarios().then(setUsuarios).catch((err) => console.error(err));
   }, [dealId]);
+
+  // Mantém o ícone do card no Kanban em sincronia — sem isso, marcar/criar uma
+  // atividade aqui só refletiria lá depois de um refetch (ex.: trocar de funil).
+  useEffect(() => {
+    onAtividadesStatusChange?.(dealId, atividades.some((a) => !a.concluida));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atividades, dealId]);
 
   const funnel = deal ? FUNNELS.find((f) => f.id === deal.funnelId) : undefined;
   const organizacao = getOrganizacao(deal?.organizacaoId);
@@ -546,7 +559,7 @@ export default function DealDetailPanel({
         {/* Main */}
         <main className="flex-1 overflow-y-auto px-6 py-5">
           <div className="flex items-center gap-5 border-b border-border-soft mb-4">
-            {(["anotacoes", "atividades"] as const).map((tab) => (
+            {(["linha_tempo", "anotacoes", "atividades"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setAbaPrincipal(tab)}
@@ -556,12 +569,26 @@ export default function DealDetailPanel({
                     : "border-transparent text-text-faint hover:text-text-gray"
                 }`}
               >
-                {tab === "anotacoes" ? `Anotações (${anotacoes.length})` : `Atividades (${atividades.length})`}
+                {tab === "linha_tempo"
+                  ? "Linha do tempo"
+                  : tab === "anotacoes"
+                  ? `Anotações (${anotacoes.length})`
+                  : `Atividades (${atividades.length})`}
               </button>
             ))}
           </div>
 
-          {abaPrincipal === "anotacoes" ? (
+          {abaPrincipal === "linha_tempo" && (
+            <TimelineTab
+              dealId={deal.id}
+              deal={deal}
+              anotacoes={anotacoes}
+              atividades={atividades}
+              setAtividades={setAtividades}
+            />
+          )}
+
+          {abaPrincipal === "anotacoes" && (
             <div className="space-y-6 max-w-3xl">
               <div>
                 <RichTextEditor
@@ -609,7 +636,9 @@ export default function DealDetailPanel({
                 ))}
               </div>
             </div>
-          ) : (
+          )}
+
+          {abaPrincipal === "atividades" && (
             <AtividadesTab
               dealId={deal.id}
               atividades={atividades}
@@ -923,6 +952,171 @@ function AtividadeRow({ atividade, onToggle }: { atividade: Atividade; onToggle:
           {atividade.horaFim} · {atividade.responsavelNome}
         </p>
         {atividade.observacoes && <p className="text-[12px] text-text-gray mt-1">{atividade.observacoes}</p>}
+      </div>
+    </div>
+  );
+}
+
+type TimelineEntry =
+  | { kind: "criado"; ts: string }
+  | { kind: "anotacao"; ts: string; data: Anotacao }
+  | { kind: "atividade"; ts: string; data: Atividade };
+
+const TIMELINE_FILTROS = [
+  { id: "todas", label: "Todas" },
+  { id: "atividades", label: "Atividades" },
+  { id: "anotacoes", label: "Anotações" },
+] as const;
+
+function TimelineTab({
+  dealId,
+  deal,
+  anotacoes,
+  atividades,
+  setAtividades,
+}: {
+  dealId: string;
+  deal: Deal;
+  anotacoes: Anotacao[];
+  atividades: Atividade[];
+  setAtividades: (fn: (prev: Atividade[]) => Atividade[]) => void;
+}) {
+  const [filtro, setFiltro] = useState<(typeof TIMELINE_FILTROS)[number]["id"]>("todas");
+
+  const entradas: TimelineEntry[] = useMemo(() => {
+    const criado: TimelineEntry = { kind: "criado", ts: `${deal.createdAt}T00:00:00` };
+    const doasAnotacoes: TimelineEntry[] = anotacoes.map((a) => ({
+      kind: "anotacao",
+      ts: a.criadoEm,
+      data: a,
+    }));
+    const dasAtividades: TimelineEntry[] = atividades.map((a) => ({
+      kind: "atividade",
+      ts: a.criadoEm,
+      data: a,
+    }));
+    return [criado, ...doasAnotacoes, ...dasAtividades].sort(
+      (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+    );
+  }, [deal.createdAt, anotacoes, atividades]);
+
+  const filtradas = entradas.filter((e) => {
+    if (filtro === "todas") return true;
+    if (filtro === "atividades") return e.kind === "atividade";
+    if (filtro === "anotacoes") return e.kind === "anotacao";
+    return true;
+  });
+
+  async function handleToggle(atividade: Atividade) {
+    setAtividades((prev) =>
+      prev.map((x) => (x.id === atividade.id ? { ...x, concluida: !x.concluida } : x))
+    );
+    try {
+      await marcarAtividadeConcluida(dealId, atividade.id, !atividade.concluida);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  return (
+    <div className="max-w-3xl">
+      <div className="flex items-center gap-1.5 mb-4">
+        {TIMELINE_FILTROS.map((f) => {
+          const count =
+            f.id === "todas"
+              ? entradas.length
+              : f.id === "atividades"
+              ? atividades.length
+              : anotacoes.length;
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFiltro(f.id)}
+              className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                filtro === f.id
+                  ? "bg-brand-soft text-brand-strong"
+                  : "text-text-faint hover:bg-panel-bg hover:text-text-gray"
+              }`}
+            >
+              {f.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="relative space-y-5 pl-2">
+        <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border-soft" />
+        {filtradas.map((entrada) => {
+          if (entrada.kind === "criado") {
+            return (
+              <div key="criado" className="relative flex gap-3">
+                <div className="relative z-10 h-8 w-8 rounded-full bg-panel-bg border border-border flex items-center justify-center shrink-0 text-text-faint">
+                  <Plus size={14} />
+                </div>
+                <div className="pt-1.5 text-[12.5px] text-text-gray">
+                  Negócio criado · {formatDateTime(entrada.ts)}
+                </div>
+              </div>
+            );
+          }
+
+          if (entrada.kind === "anotacao") {
+            const a = entrada.data;
+            return (
+              <div key={`a-${a.id}`} className="relative flex gap-3">
+                <div className="relative z-10 h-8 w-8 rounded-full bg-brand-soft text-brand-strong flex items-center justify-center shrink-0">
+                  <Clock size={14} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] text-text-dark">
+                    <span className="font-semibold">{a.autorNome}</span> às {formatDateTime(a.criadoEm)}
+                  </p>
+                  <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark whitespace-pre-wrap">
+                    {a.texto}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          const at = entrada.data;
+          return (
+            <div key={`t-${at.id}`} className="relative flex gap-3">
+              <div className="relative z-10 h-8 w-8 rounded-full bg-panel-bg border border-border flex items-center justify-center shrink-0 text-text-gray">
+                <CalendarDays size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] text-text-dark">
+                  <span className="font-semibold">{at.responsavelNome}</span> às {formatDateTime(at.criadoEm)}
+                </p>
+                <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark">
+                  {at.titulo}
+                </div>
+                <div className="mt-2 rounded-lg border border-border-soft bg-card-bg p-3">
+                  <p className="text-[11px] font-semibold text-text-faint uppercase tracking-wide">
+                    {ATIVIDADE_TIPO_LABEL[at.tipo]}
+                  </p>
+                  <p className="text-[12.5px] text-text-gray mt-0.5">
+                    {new Date(at.data + "T00:00:00").toLocaleDateString("pt-BR")} · {at.horaInicio} até{" "}
+                    {at.horaFim}
+                  </p>
+                  <button
+                    onClick={() => handleToggle(at)}
+                    className={`mt-2 flex items-center gap-1.5 text-[12.5px] font-medium ${
+                      at.concluida ? "text-badge-green-text" : "text-brand-strong hover:underline"
+                    }`}
+                  >
+                    <Check size={13} />
+                    {at.concluida ? "Concluída" : "Marcar como concluída"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {filtradas.length === 0 && (
+          <p className="text-[12.5px] text-text-faint py-6 text-center">Nada por aqui ainda.</p>
+        )}
       </div>
     </div>
   );
