@@ -46,7 +46,7 @@ export default function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={labelledBy}
-      className={`fixed inset-0 z-[100] flex items-center justify-center px-4 py-6 bg-black/40 ${
+      className={`fixed inset-0 z-[100] flex items-center justify-center px-4 py-6 bg-black/40 backdrop-blur-[2px] ${
         closing ? "" : "animate-overlay-in"
       }`}
       style={closing ? { opacity: 0, transition: "opacity 150ms ease-in" } : undefined}
@@ -55,7 +55,7 @@ export default function Modal({
       }}
     >
       <div
-        className={`w-full ${widthClass} max-h-[90vh] bg-card-bg rounded-2xl shadow-2xl border border-border flex flex-col ${
+        className={`w-full ${widthClass} max-h-[90vh] bg-card-bg rounded-2xl shadow-2xl border border-border/60 flex flex-col ${
           closing ? "animate-sheet-out" : "animate-sheet-in"
         }`}
       >

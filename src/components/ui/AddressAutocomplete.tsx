@@ -56,7 +56,7 @@ export default function AddressAutocomplete({
       </div>
 
       {open && (query.trim().length >= 3 || results.length > 0) && (
-        <div className="absolute z-30 mt-1.5 w-full rounded-xl border border-border bg-card-bg shadow-lg overflow-hidden animate-dropdown-in">
+        <div className="absolute z-30 mt-1.5 w-full rounded-xl border border-border bg-card-bg/95 backdrop-blur-md shadow-lg overflow-hidden animate-dropdown-in">
           {loading ? (
             <div className="p-1.5 space-y-1.5">
               {[0, 1, 2].map((i) => (

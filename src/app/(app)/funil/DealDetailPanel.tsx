@@ -300,7 +300,7 @@ export default function DealDetailPanel({
               {ownerMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setOwnerMenuOpen(false)} />
-                  <div className="absolute right-0 mt-1.5 w-56 rounded-lg border border-border bg-card-bg shadow-lg z-50 overflow-hidden max-h-64 overflow-y-auto">
+                  <div className="absolute right-0 mt-1.5 w-56 rounded-lg border border-border bg-card-bg/95 backdrop-blur-md shadow-lg z-50 overflow-hidden max-h-64 overflow-y-auto">
                     {usuarios.length === 0 && (
                       <p className="px-3 py-2.5 text-[12px] text-text-faint">Carregando equipe...</p>
                     )}
@@ -354,7 +354,7 @@ export default function DealDetailPanel({
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 mt-1.5 w-64 rounded-lg border border-border bg-card-bg shadow-lg z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-1.5 w-64 rounded-lg border border-border bg-card-bg/95 backdrop-blur-md shadow-lg z-50 overflow-hidden">
                     <button
                       onClick={handleExportarAnotacoes}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left text-[13px] text-text-gray hover:bg-panel-bg transition-colors"

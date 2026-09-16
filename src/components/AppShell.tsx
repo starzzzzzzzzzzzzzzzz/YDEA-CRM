@@ -208,7 +208,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {userMenuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-border bg-card-bg shadow-lg z-40 overflow-hidden animate-dropdown-in">
+                <div className="absolute right-0 mt-2 w-72 rounded-xl border border-border bg-card-bg/95 backdrop-blur-md shadow-lg z-40 overflow-hidden animate-dropdown-in">
                   {/* Cabeçalho: avatar + nome + unidade */}
                   <div className="px-3.5 py-3 border-b border-border-soft flex items-center gap-2.5">
                     <div className="h-9 w-9 rounded-full bg-brand-soft text-brand-strong font-display font-semibold text-xs flex items-center justify-center shrink-0 overflow-hidden">

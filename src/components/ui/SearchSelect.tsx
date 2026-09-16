@@ -160,7 +160,7 @@ export default function SearchSelect({
       )}
 
       {open && (
-        <div className="absolute z-30 mt-1.5 w-full rounded-xl border border-border bg-card-bg shadow-lg overflow-hidden animate-dropdown-in">
+        <div className="absolute z-30 mt-1.5 w-full rounded-xl border border-border bg-card-bg/95 backdrop-blur-md shadow-lg overflow-hidden animate-dropdown-in">
           <div className="max-h-64 overflow-y-auto py-1.5">
             {filtered.length === 0 ? (
               <div className="px-3.5 py-4 text-center text-xs text-text-faint">{emptyHint}</div>

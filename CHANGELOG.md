@@ -4,6 +4,25 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v11 — Visual mais moderno (sombras, vidro nos menus), sem mexer nas cores
+
+**O que esta versão faz:**
+- **Sombras globais mais suaves e "flutuantes"** — em vez de uma sombra única e dura, agora são duas camadas sobrepostas (mais sutil de perto, mais presença de longe). Como isso é feito via token do Tailwind (`--shadow-sm/md/lg/xl/2xl`), todo `shadow-sm`/`shadow-md`/etc. já usado no app melhora automaticamente — sem precisar editar tela por tela.
+- **Efeito de vidro (glass) nos menus flutuantes**: menu de perfil, seletores de busca (organização/pessoa/responsável), autocomplete de endereço, e os menus de ação do negócio (⋯) agora têm fundo semi-transparente com desfoque (`backdrop-blur`) em vez de fundo sólido — dá uma sensação mais moderna de profundidade.
+- **Modal com fundo desfocado** — abrir qualquer modal (Novo negócio, Novo cliente, etc.) agora desfoca sutilmente o que está atrás, e a borda do card ficou mais discreta (a sombra passou a fazer mais esse trabalho).
+- Nenhuma cor da paleta foi alterada.
+
+**O que mudou por baixo:**
+- `globals.css`: novos tokens `--shadow-sm/md/lg/xl/2xl`.
+- `Modal.tsx`, `SearchSelect.tsx`, `AddressAutocomplete.tsx`, `AppShell.tsx`, `DealDetailPanel.tsx`: `backdrop-blur` + fundo semi-transparente nos elementos flutuantes.
+
+**Nota de segurança:** encontrei dois arquivos soltos na raiz do projeto que não fazem parte do CRM — `guardian-account-data.txt` (continha e-mail, ID de conta e uma chave pública; parece ter entrado por acidente em algum zip) e `mensagem-commit.txt` (rascunho de commit de uma sessão anterior). Removi os dois desta entrega. Se `guardian-account-data.txt` já foi commitado alguma vez no repositório, vale rodar `git log --all --full-history -- guardian-account-data.txt` pra confirmar, e se aparecer, ele precisa ser removido do **histórico** do Git também, não só do arquivo atual.
+
+**O que ainda falta (conhecido, não é bug):**
+- Layout mais flexível (sidebar retrátil, colunas do funil colapsáveis) e Dashboard com gráficos animados continuam pendentes.
+
+---
+
 ## v10 — Linha do tempo no negócio + ícone do card sincronizado ao vivo
 
 **O que esta versão faz:**
