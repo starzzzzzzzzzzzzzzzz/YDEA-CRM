@@ -4,6 +4,22 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v12 — Logo corrigida + tela de login redesenhada
+
+**O que esta versão faz:**
+- **Corrigido o bug da logo não aparecer**: o componente já esperava um arquivo em `public/logo.png`, mas esse arquivo nunca existia na pasta — coloquei o arquivo de verdade que você mandou.
+- **Tela de login totalmente redesenhada**: em telas grandes, ganhou um painel de marca do lado esquerdo com o gradiente oficial da logo (teal → azul), título, descrição e 3 destaques do produto; o formulário fica do lado direito, com campos maiores, mais espaçados, cantos mais arredondados e o botão "Entrar" com o gradiente da marca. Em celular, cai pra uma coluna só (só o formulário, com a logo em cima), continua funcionando igual.
+- Removi o checkbox redundante "Mostrar senha" (o olho já fazia a mesma coisa) pra deixar o formulário mais limpo.
+- Nenhuma mudança na lógica de login — só visual.
+
+**O que mudou por baixo:**
+- `public/logo.png`: arquivo adicionado (estava faltando).
+- `src/app/login/page.tsx`: reescrita completa do layout visual.
+
+**Nota recorrente:** removi o código morto em `/funil/[id]` pela quarta vez nesta entrega. Se isso continuar voltando, é bem provável que seja o OneDrive restaurando uma versão antiga da pasta por conflito de sincronização — vale conferir se existem arquivos com "(conflito de sincronização)" no nome em algum lugar da pasta do projeto.
+
+---
+
 ## v11 — Visual mais moderno (sombras, vidro nos menus), sem mexer nas cores
 
 **O que esta versão faz:**

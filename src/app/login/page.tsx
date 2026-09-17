@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, Users2, KanbanSquare, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/store/AuthContext";
 import { LogoMark } from "@/components/ui/Logo";
+
+const DESTAQUES = [
+  { icon: Users2, label: "Clientes e negócios num só lugar" },
+  { icon: KanbanSquare, label: "Funil de vendas com Kanban" },
+  { icon: ShieldCheck, label: "Acesso por cargo, do jeito certo" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,22 +42,65 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-panel-bg px-4">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-8">
-          <div className="h-14 w-14 flex items-center justify-center mb-4">
-            <LogoMark size={52} />
-          </div>
-          <h1 className="font-display font-semibold text-xl text-text-dark mb-1">
-            Ydea Solar CRM
-          </h1>
-          <p className="text-text-gray text-sm">Autentique-se para continuar</p>
-        </div>
+    <div className="min-h-screen w-full flex bg-panel-bg">
+      {/* Painel de marca — some em telas pequenas */}
+      <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden bg-gradient-to-br from-[#3ec6ac] via-[#12b6c1] to-[#1b7cb2]">
+        {/* Blobs decorativos */}
+        <div className="absolute -top-24 -left-20 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-black/10 blur-3xl" />
+        <div className="absolute top-1/3 right-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
 
-        <div className="bg-card-bg border border-border rounded-xl p-7">
-          <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="relative z-10 flex flex-col justify-between p-12 w-full">
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-xl bg-white/95 flex items-center justify-center shadow-lg p-1.5">
+              <LogoMark size={28} />
+            </div>
+            <span className="font-display font-bold text-xl text-white lowercase tracking-tight">
+              ydea
+            </span>
+          </div>
+
+          <div>
+            <h2 className="font-display font-bold text-[28px] leading-tight text-white mb-3 max-w-sm">
+              O CRM da Ydea Solar, feito sob medida.
+            </h2>
+            <p className="text-white/80 text-sm max-w-xs mb-8">
+              Clientes, funil de vendas e equipe — tudo integrado, no ritmo da sua operação.
+            </p>
+            <div className="space-y-3">
+              {DESTAQUES.map((d) => (
+                <div key={d.label} className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                    <d.icon size={15} className="text-white" />
+                  </div>
+                  <span className="text-white/90 text-[13.5px] font-medium">{d.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-white/60 text-xs">© {new Date().getFullYear()} Ydea Energia Solar</p>
+        </div>
+      </div>
+
+      {/* Formulário */}
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm">
+          <div className="flex flex-col items-center lg:items-start mb-9">
+            <div className="h-14 w-14 lg:hidden flex items-center justify-center mb-4">
+              <LogoMark size={52} />
+            </div>
+            <h1 className="font-display font-bold text-2xl text-text-dark mb-1.5 text-center lg:text-left">
+              Bem-vindo de volta
+            </h1>
+            <p className="text-text-gray text-sm text-center lg:text-left">
+              Entre com sua conta pra acessar o CRM.
+            </p>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-[12.5px] text-red-700">
+              <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 px-3.5 py-3 text-[12.5px] text-red-700">
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -60,9 +109,9 @@ export default function LoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-xs font-semibold text-text-gray mb-2 tracking-wide"
+                className="block text-[13px] font-medium text-text-dark mb-1.5"
               >
-                E-MAIL
+                E-mail
               </label>
               <input
                 id="email"
@@ -72,17 +121,19 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
-                className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-colors"
+                className="w-full rounded-xl bg-panel-bg border border-border px-4 py-3 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="senha"
-                className="block text-xs font-semibold text-text-gray mb-2 tracking-wide"
-              >
-                SENHA
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="senha" className="block text-[13px] font-medium text-text-dark">
+                  Senha
+                </label>
+                <a href="#" className="text-[12.5px] text-brand-strong hover:underline">
+                  Esqueci minha senha
+                </a>
+              </div>
               <div className="relative">
                 <input
                   id="senha"
@@ -92,47 +143,39 @@ export default function LoginPage() {
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 pr-10 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-colors"
+                  className="w-full rounded-xl bg-panel-bg border border-border px-4 py-3 pr-11 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-faint hover:text-text-gray"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-faint hover:text-text-gray transition-colors"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-[13px] text-text-gray select-none">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={() => setShowPassword((v) => !v)}
-                  className="h-3.5 w-3.5 rounded-sm border-border accent-[var(--brand)]"
-                />
-                Mostrar senha
-              </label>
-              <a href="#" className="text-[13px] text-brand-strong hover:text-brand-strong transition-colors">
-                Esqueci minha senha
-              </a>
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-text-dark text-white font-semibold text-sm py-2.5 mt-2 hover:brightness-110 active:brightness-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="btn-press w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#12b6c1] to-[#1b7cb2] text-white font-semibold text-sm py-3.5 mt-2 shadow-md hover:shadow-lg hover:brightness-105 active:brightness-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? "Entrando..." : "Entrar"}
+              {submitting ? (
+                "Entrando..."
+              ) : (
+                <>
+                  Entrar
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
-        </div>
 
-        <p className="text-xs text-text-faint text-center mt-6">
-          Acesso restrito a colaboradores Ydea Solar. Sua conta é criada por um administrador.
-        </p>
+          <p className="text-xs text-text-faint text-center lg:text-left mt-7">
+            Acesso restrito a colaboradores Ydea Solar. Sua conta é criada por um administrador.
+          </p>
+        </div>
       </div>
     </div>
   );
