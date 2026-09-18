@@ -4,6 +4,24 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v13 — Visual do detalhe do negócio: barra de etapas e Linha do tempo mais ricas
+
+**O que esta versão faz:**
+- **Barra de progresso das etapas** (topo do negócio): mais espaçosa, o ponto da etapa atual agora tem um leve halo (glow) na cor da marca, etapas concluídas mostram um check dentro do ponto, e a transição entre estados ficou suave.
+- **Cards da Linha do tempo** ganharam cor por tipo de atividade — Ligação (azul), WhatsApp (verde), E-mail (roxo), Reunião (âmbar), Visita (laranja), Tarefa (cinza) — cada uma com ícone próprio no círculo e uma etiqueta colorida dentro do card, no lugar do texto cinza genérico de antes.
+- Os filtros da Linha do tempo (Todas/Atividades/Anotações) viraram um seletor segmentado (visual de "pílula" com a opção ativa destacada), em vez de botões soltos.
+- Cards de anotação e atividade na Linha do tempo ganharam uma sombra sutil, e as linhas de informação na barra lateral (Negócio, Personalizados) agora têm um traço fino separando cada linha, mais fácil de escanear.
+- Mais espaço no final da barra lateral, pro último card ("Documentos e fotos") não ficar espremido contra a borda.
+
+**O que mudou por baixo:**
+- `DealDetailPanel.tsx`: `SidebarCard`/`InfoRow` com mais respiro e sombra; nova constante `ATIVIDADE_TIPO_STYLE` mapeando cada tipo de atividade a um ícone e cor; barra de etapas redesenhada.
+
+**Sobre o "N" flutuando sobre o Financiamento no seu print:** não achei nada no código que explique isso — pode ser algo do navegador ou de uma extensão, não do app. Se continuar aparecendo depois dessa atualização, me manda um print de novo que eu investigo mais a fundo.
+
+**Nota recorrente:** removi o código morto em `/funil/[id]` pela **quinta vez**. Meu forte palpite continua sendo o OneDrive restaurando uma versão antiga da pasta — vale a pena confirmar aquela checagem de arquivos "(conflito de sincronização)" que ficou pendente.
+
+---
+
 ## v12 — Logo corrigida + tela de login redesenhada
 
 **O que esta versão faz:**

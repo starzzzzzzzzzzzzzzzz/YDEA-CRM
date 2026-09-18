@@ -20,6 +20,12 @@ import {
   Trash2,
   Download,
   Plus,
+  Phone,
+  MessageCircle,
+  Mail,
+  Users,
+  MapPin,
+  ListChecks,
 } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
@@ -61,7 +67,7 @@ function formatDateTime(iso: string) {
 
 function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-1.5 text-[13px]">
+    <div className="flex items-start justify-between gap-3 py-2 text-[13px] border-b border-border-soft last:border-b-0">
       <span className="text-text-faint shrink-0">{label}</span>
       <span className="text-text-dark font-medium text-right">{value ?? "—"}</span>
     </div>
@@ -78,9 +84,9 @@ function SidebarCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card-bg p-4">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-display font-semibold text-[13px] text-text-dark">{title}</h4>
+    <div className="rounded-xl border border-border bg-card-bg p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2.5">
+        <h4 className="font-display font-semibold text-[13px] text-text-dark tracking-wide">{title}</h4>
         {action}
       </div>
       {children}
@@ -423,38 +429,46 @@ export default function DealDetailPanel({
 
         {/* Stage progress */}
         {funnel && (
-          <div className="flex items-center">
-            {funnel.stages.map((stage, idx) => (
-              <button
-                key={stage.id}
-                onClick={() => handleStageClick(stage.id)}
-                title={stage.label}
-                className="group flex-1 flex flex-col items-center gap-1.5 relative"
-              >
-                <div
-                  className={`h-1.5 w-full absolute top-1.5 left-0 -translate-y-1/2 ${
-                    idx === 0 ? "rounded-l-full" : ""
-                  } ${idx === funnel.stages.length - 1 ? "rounded-r-full" : ""} ${
-                    idx <= currentStageIndex ? "bg-brand" : "bg-border"
-                  }`}
-                  style={{ zIndex: 0 }}
-                />
-                <span
-                  className={`relative z-10 h-3 w-3 rounded-full border-2 transition-colors ${
-                    idx <= currentStageIndex
-                      ? "bg-brand border-brand"
-                      : "bg-card-bg border-border group-hover:border-brand"
-                  }`}
-                />
-                <span
-                  className={`text-[10.5px] leading-tight text-center px-1 ${
-                    idx === currentStageIndex ? "text-brand-strong font-semibold" : "text-text-faint"
-                  }`}
+          <div className="flex items-center pt-1">
+            {funnel.stages.map((stage, idx) => {
+              const done = idx < currentStageIndex;
+              const atual = idx === currentStageIndex;
+              return (
+                <button
+                  key={stage.id}
+                  onClick={() => handleStageClick(stage.id)}
+                  title={stage.label}
+                  className="group flex-1 flex flex-col items-center gap-2 relative"
                 >
-                  {stage.label}
-                </span>
-              </button>
-            ))}
+                  <div
+                    className={`h-[3px] w-full absolute top-2 left-0 -translate-y-1/2 transition-colors duration-300 ${
+                      idx === 0 ? "rounded-l-full" : ""
+                    } ${idx === funnel.stages.length - 1 ? "rounded-r-full" : ""} ${
+                      idx <= currentStageIndex ? "bg-brand" : "bg-border"
+                    }`}
+                    style={{ zIndex: 0 }}
+                  />
+                  <span
+                    className={`relative z-10 flex items-center justify-center h-4 w-4 rounded-full border-2 transition-all duration-200 ${
+                      atual
+                        ? "bg-brand border-brand shadow-[0_0_0_4px_var(--brand-soft)] scale-110"
+                        : done
+                        ? "bg-brand border-brand"
+                        : "bg-card-bg border-border group-hover:border-brand group-hover:scale-110"
+                    }`}
+                  >
+                    {done && <Check size={9} className="text-white" strokeWidth={3} />}
+                  </span>
+                  <span
+                    className={`text-[11px] leading-tight text-center px-1 transition-colors ${
+                      atual ? "text-brand-strong font-semibold" : done ? "text-text-gray" : "text-text-faint"
+                    }`}
+                  >
+                    {stage.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -554,6 +568,7 @@ export default function DealDetailPanel({
               </SidebarCard>
             </>
           )}
+          <div className="h-2" />
         </aside>
 
         {/* Main */}
@@ -968,6 +983,18 @@ const TIMELINE_FILTROS = [
   { id: "anotacoes", label: "Anotações" },
 ] as const;
 
+const ATIVIDADE_TIPO_STYLE: Record<
+  AtividadeTipo,
+  { icon: typeof Phone; iconBg: string; iconText: string; badgeBg: string; badgeText: string }
+> = {
+  ligacao: { icon: Phone, iconBg: "bg-blue-100", iconText: "text-blue-600", badgeBg: "bg-blue-50", badgeText: "text-blue-700" },
+  whatsapp: { icon: MessageCircle, iconBg: "bg-emerald-100", iconText: "text-emerald-600", badgeBg: "bg-emerald-50", badgeText: "text-emerald-700" },
+  email: { icon: Mail, iconBg: "bg-purple-100", iconText: "text-purple-600", badgeBg: "bg-purple-50", badgeText: "text-purple-700" },
+  reuniao: { icon: Users, iconBg: "bg-amber-100", iconText: "text-amber-600", badgeBg: "bg-amber-50", badgeText: "text-amber-700" },
+  visita: { icon: MapPin, iconBg: "bg-orange-100", iconText: "text-orange-600", badgeBg: "bg-orange-50", badgeText: "text-orange-700" },
+  tarefa: { icon: ListChecks, iconBg: "bg-slate-200", iconText: "text-slate-600", badgeBg: "bg-slate-100", badgeText: "text-slate-700" },
+};
+
 function TimelineTab({
   dealId,
   deal,
@@ -1020,7 +1047,7 @@ function TimelineTab({
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-center gap-1.5 mb-4">
+      <div className="inline-flex items-center gap-1 mb-5 p-1 rounded-xl bg-panel-bg border border-border-soft">
         {TIMELINE_FILTROS.map((f) => {
           const count =
             f.id === "todas"
@@ -1034,8 +1061,8 @@ function TimelineTab({
               onClick={() => setFiltro(f.id)}
               className={`rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
                 filtro === f.id
-                  ? "bg-brand-soft text-brand-strong"
-                  : "text-text-faint hover:bg-panel-bg hover:text-text-gray"
+                  ? "bg-card-bg text-brand-strong shadow-sm"
+                  : "text-text-faint hover:text-text-gray"
               }`}
             >
               {f.label} ({count})
@@ -1071,7 +1098,7 @@ function TimelineTab({
                   <p className="text-[12.5px] text-text-dark">
                     <span className="font-semibold">{a.autorNome}</span> às {formatDateTime(a.criadoEm)}
                   </p>
-                  <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark whitespace-pre-wrap">
+                  <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark whitespace-pre-wrap shadow-sm">
                     {a.texto}
                   </div>
                 </div>
@@ -1080,10 +1107,14 @@ function TimelineTab({
           }
 
           const at = entrada.data;
+          const tipoStyle = ATIVIDADE_TIPO_STYLE[at.tipo];
+          const TipoIcon = tipoStyle.icon;
           return (
             <div key={`t-${at.id}`} className="relative flex gap-3">
-              <div className="relative z-10 h-8 w-8 rounded-full bg-panel-bg border border-border flex items-center justify-center shrink-0 text-text-gray">
-                <CalendarDays size={14} />
+              <div
+                className={`relative z-10 h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${tipoStyle.iconBg} ${tipoStyle.iconText}`}
+              >
+                <TipoIcon size={14} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[12.5px] text-text-dark">
@@ -1092,11 +1123,13 @@ function TimelineTab({
                 <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark">
                   {at.titulo}
                 </div>
-                <div className="mt-2 rounded-lg border border-border-soft bg-card-bg p-3">
-                  <p className="text-[11px] font-semibold text-text-faint uppercase tracking-wide">
+                <div className="mt-2 rounded-lg border border-border-soft bg-card-bg p-3 shadow-sm">
+                  <span
+                    className={`inline-block text-[10.5px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${tipoStyle.badgeBg} ${tipoStyle.badgeText}`}
+                  >
                     {ATIVIDADE_TIPO_LABEL[at.tipo]}
-                  </p>
-                  <p className="text-[12.5px] text-text-gray mt-0.5">
+                  </span>
+                  <p className="text-[12.5px] text-text-gray mt-1.5">
                     {new Date(at.data + "T00:00:00").toLocaleDateString("pt-BR")} · {at.horaInicio} até{" "}
                     {at.horaFim}
                   </p>
