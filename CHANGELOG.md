@@ -4,6 +4,21 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v14 — Cabeçalhos de página consistentes + estado vazio melhor em Clientes
+
+**O que esta versão faz:**
+- **Clientes, Leads, Instalações e Funil** ganharam um cabeçalho de página (título + descrição curta) — antes só Dashboard e Equipe tinham isso, o resto das telas caía direto na barra de ferramentas sem nenhum título. Agora todas as telas do menu principal têm essa mesma identidade visual.
+- **Estado vazio da lista de Clientes** ficou mais acolhedor: em vez de uma linha de texto cinza, agora mostra um ícone, uma mensagem principal e uma dica — igual ao padrão que boas telas de "nada aqui ainda" costumam usar.
+
+**O que mudou por baixo:**
+- `clientes/page.tsx`, `leads/LeadsTable.tsx`, `instalacoes/KanbanBoard.tsx`, `funil/FunnelBoard.tsx`: cabeçalho `<h1>` + descrição adicionados.
+- `clientes/page.tsx`: bloco de estado vazio da tabela reescrito.
+
+**O que ainda falta (conhecido, não é bug):**
+- Layout mais flexível (sidebar retrátil, colunas do funil colapsáveis) e Dashboard com gráficos animados continuam pendentes.
+
+---
+
 ## v13 — Visual do detalhe do negócio: barra de etapas e Linha do tempo mais ricas
 
 **O que esta versão faz:**

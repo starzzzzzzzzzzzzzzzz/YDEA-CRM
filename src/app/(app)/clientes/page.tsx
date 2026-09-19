@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 import { STATUS_LABEL, TEMPERATURA_LABEL, CLIENTE_STATUS_STYLE } from "@/lib/types";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useState } from "react";
@@ -21,6 +21,13 @@ export default function ClientesPage() {
 
   return (
     <div>
+      <div className="mb-6">
+        <h1 className="font-display font-bold text-xl text-text-dark mb-1">Clientes</h1>
+        <p className="text-[13px] text-text-gray">
+          Cadastro completo de clientes — contato, endereço e dados energéticos.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <div className="text-sm text-text-gray">
           <span className="font-semibold text-text-dark">
@@ -130,10 +137,20 @@ export default function ClientesPage() {
               ))}
             {!clientesLoading && filtrados.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-text-faint">
-                  {clientes.length === 0
-                    ? 'Nenhum cliente cadastrado ainda. Clique em "Novo cliente" pra começar.'
-                    : "Nenhum cliente encontrado."}
+                <td colSpan={6} className="px-5 py-14 text-center">
+                  <div className="flex flex-col items-center gap-2.5">
+                    <div className="h-11 w-11 rounded-full bg-panel-bg flex items-center justify-center">
+                      <Users size={18} className="text-text-faint" />
+                    </div>
+                    <p className="text-[13.5px] font-medium text-text-dark">
+                      {clientes.length === 0 ? "Nenhum cliente cadastrado ainda" : "Nenhum cliente encontrado"}
+                    </p>
+                    <p className="text-[12.5px] text-text-faint">
+                      {clientes.length === 0
+                        ? 'Clique em "Novo cliente" pra começar.'
+                        : "Tenta ajustar a busca."}
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}

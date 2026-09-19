@@ -317,6 +317,7 @@ export default function FunnelBoard() {
 
   return (
     <div>
+      <h1 className="font-display font-bold text-xl text-text-dark mb-4">Funil de Vendas</h1>
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <FunnelSwitcher
           funnels={visibleFunnels}

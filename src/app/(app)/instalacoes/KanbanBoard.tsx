@@ -176,6 +176,13 @@ export default function KanbanBoard() {
 
   return (
     <div>
+      <div className="mb-6">
+        <h1 className="font-display font-bold text-xl text-text-dark mb-1">Instalações</h1>
+        <p className="text-[13px] text-text-gray">
+          Acompanhamento da equipe de campo, do agendamento até a conclusão.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between mb-5">
         <div className="text-sm text-text-gray">
           <span className="font-semibold text-text-dark">{leads.length} negócios</span>

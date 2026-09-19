@@ -48,6 +48,13 @@ export default function LeadsTable() {
 
   return (
     <div>
+      <div className="mb-6">
+        <h1 className="font-display font-bold text-xl text-text-dark mb-1">Leads</h1>
+        <p className="text-[13px] text-text-gray">
+          Contatos que ainda não viraram cliente — acompanhe até virarem negócio no funil.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
         <div className="text-sm text-text-gray">
           <span className="font-semibold text-text-dark">
