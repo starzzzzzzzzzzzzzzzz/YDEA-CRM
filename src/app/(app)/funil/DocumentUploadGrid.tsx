@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Upload, Eye, Download, Trash2, FileText, Loader2, X } from "lucide-react";
+import { Plus, Eye, Download, Trash2, FileText, Loader2, X } from "lucide-react";
 import { DocumentoAnexo, DocumentoTipo, DOCUMENTO_LABEL } from "@/lib/types";
 import { arquivoParaDataUrl } from "@/lib/fileToDataUrl";
 import { addDocumento, removeDocumento } from "@/lib/firebase/documentos";
@@ -126,6 +126,33 @@ function Visualizador({ anexo, onClose }: { anexo: DocumentoAnexo; onClose: () =
   );
 }
 
+function AcaoBtn({
+  icon,
+  label,
+  onClick,
+  perigo = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  perigo?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-7 px-2 rounded-md border border-border-soft text-[11px] font-medium flex items-center gap-1 transition-colors ${
+        perigo
+          ? "text-text-gray hover:text-badge-red-text"
+          : "text-text-gray hover:text-brand-strong hover:bg-brand-soft"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function DocCard({
   tipo,
   arquivos,
@@ -156,122 +183,92 @@ function DocCard({
         setDragOver(false);
         if (e.dataTransfer.files?.length) onAdd(e.dataTransfer.files);
       }}
-      className={`rounded-xl border p-3.5 transition-colors ${
+      className={`rounded-xl border p-3 transition-colors ${
         dragOver ? "border-brand bg-brand-soft" : "border-border bg-panel-bg"
       }`}
     >
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="h-8 w-8 rounded-lg bg-card-bg border border-border flex items-center justify-center text-text-gray shrink-0">
-            <FileText size={15} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-text-dark truncate">
-              {DOCUMENTO_LABEL[tipo]}
-            </p>
-            <p className="text-[11px] text-text-faint">
-              {arquivos.length} arquivo{arquivos.length !== 1 ? "s" : ""}
-            </p>
-          </div>
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="h-8 w-8 rounded-lg bg-card-bg border border-border flex items-center justify-center text-text-gray shrink-0">
+          <FileText size={15} />
         </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="h-7 w-7 rounded-md flex items-center justify-center text-brand-strong hover:bg-brand-soft transition-colors shrink-0 disabled:opacity-50"
-          aria-label={`Enviar ${DOCUMENTO_LABEL[tipo]}`}
-        >
-          {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) onAdd(e.target.files);
-            e.target.value = "";
-          }}
-        />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-text-dark truncate">{DOCUMENTO_LABEL[tipo]}</p>
+          <p className="text-[11px] text-text-faint">
+            {arquivos.length} arquivo{arquivos.length !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
-      {arquivos.length === 0 ? (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="w-full rounded-lg border border-dashed border-border py-3 text-[11.5px] text-text-faint hover:border-brand hover:text-brand-strong transition-colors"
-        >
-          Arraste um arquivo ou clique para enviar
-        </button>
-      ) : (
-        <div className="space-y-1.5">
+      {arquivos.length > 0 && (
+        <div className="space-y-2 mb-2.5">
           {arquivos.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center gap-2 bg-card-bg border border-border-soft rounded-lg px-2 py-1.5"
-            >
-              <button
-                type="button"
-                onClick={() => onView(a)}
-                disabled={!a.previewUrl}
-                className="shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-default"
-                aria-label={`Visualizar ${a.nome}`}
-              >
-                {ehImagem(a) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.previewUrl} alt={a.nome} className="h-7 w-7 rounded object-cover" />
-                ) : (
-                  <div className="h-7 w-7 rounded bg-panel-bg flex items-center justify-center">
-                    <FileText size={12} className="text-text-faint" />
-                  </div>
+            <div key={a.id} className="rounded-lg bg-card-bg border border-border-soft p-2">
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => onView(a)}
+                  disabled={!a.previewUrl}
+                  className="shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-default"
+                  aria-label={`Visualizar ${a.nome}`}
+                >
+                  {ehImagem(a) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.previewUrl} alt={a.nome} className="h-10 w-10 rounded-md object-cover" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-md bg-panel-bg flex items-center justify-center">
+                      <FileText size={16} className="text-text-faint" />
+                    </div>
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-medium text-text-dark" title={a.nome}>
+                    {a.nome}
+                  </p>
+                  <p className="text-[10.5px] text-text-faint">{(a.tamanho / 1024).toFixed(0)}KB</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {a.previewUrl && (
+                  <>
+                    <AcaoBtn icon={<Eye size={12} />} label="Ver" onClick={() => onView(a)} />
+                    <AcaoBtn icon={<Download size={12} />} label="Baixar" onClick={() => baixar(a)} />
+                  </>
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={() => onView(a)}
-                disabled={!a.previewUrl}
-                className="flex-1 min-w-0 truncate text-left text-[12px] text-text-dark hover:text-brand-strong disabled:hover:text-text-dark disabled:cursor-default"
-              >
-                {a.nome}
-              </button>
-              <span className="text-[10.5px] text-text-faint shrink-0">
-                {(a.tamanho / 1024).toFixed(0)}KB
-              </span>
-              {a.previewUrl && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onView(a)}
-                    className="text-text-faint hover:text-text-gray shrink-0"
-                    aria-label="Visualizar"
-                    title="Visualizar"
-                  >
-                    <Eye size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => baixar(a)}
-                    className="text-text-faint hover:text-text-gray shrink-0"
-                    aria-label="Baixar"
-                    title="Baixar"
-                  >
-                    <Download size={13} />
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                onClick={() => onRemove(a.id)}
-                className="text-text-faint hover:text-badge-red-text shrink-0"
-                aria-label="Excluir"
-                title="Excluir"
-              >
-                <Trash2 size={13} />
-              </button>
+                <AcaoBtn icon={<Trash2 size={12} />} label="Excluir" onClick={() => onRemove(a.id)} perigo />
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) onAdd(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="w-full rounded-lg border border-dashed border-border py-2.5 text-[11.5px] text-text-faint hover:border-brand hover:text-brand-strong transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+      >
+        {uploading ? (
+          <>
+            <Loader2 size={13} className="animate-spin" />
+            Enviando...
+          </>
+        ) : (
+          <>
+            <Plus size={13} />
+            {arquivos.length === 0 ? "Arraste ou clique para enviar" : "Adicionar arquivo"}
+          </>
+        )}
+      </button>
     </div>
   );
 }
@@ -342,7 +339,8 @@ export default function DocumentUploadGrid({
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="@container">
+        <div className="grid grid-cols-1 @xl:grid-cols-2 @3xl:grid-cols-3 gap-3">
         {DOC_TYPES.map((tipo) => (
           <DocCard
             key={tipo}
@@ -354,6 +352,7 @@ export default function DocumentUploadGrid({
             onView={setVisualizando}
           />
         ))}
+        </div>
       </div>
 
       {visualizando && <Visualizador anexo={visualizando} onClose={() => setVisualizando(null)} />}
