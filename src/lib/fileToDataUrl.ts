@@ -69,3 +69,14 @@ export async function arquivoParaDataUrl(file: File): Promise<string> {
   }
   return lerArquivoComoDataUrl(file);
 }
+
+/**
+ * Foto pra anotação: mais comprimida que a de documento, porque várias fotos
+ * dividem o limite de 1MB do documento da anotação no Firestore.
+ */
+export async function fotoParaDataUrl(file: File): Promise<string> {
+  if (!isImagem(file)) {
+    throw new Error(`"${file.name}" não é uma imagem.`);
+  }
+  return resizeImagemParaDataUrl(file, 1100, 0.7);
+}

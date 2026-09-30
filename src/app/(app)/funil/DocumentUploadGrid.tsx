@@ -19,23 +19,25 @@ const DOC_TYPES: DocumentoTipo[] = [
   "drone",
 ];
 
-function ehImagem(a: DocumentoAnexo): boolean {
+type AnexoMinimo = Pick<DocumentoAnexo, "nome" | "previewUrl">;
+
+function ehImagem(a: AnexoMinimo): boolean {
   return !!a.previewUrl && (a.previewUrl.startsWith("data:image") || a.previewUrl.startsWith("blob:"));
 }
 
-function ehPdf(a: DocumentoAnexo): boolean {
+function ehPdf(a: AnexoMinimo): boolean {
   return !!a.previewUrl?.startsWith("data:application/pdf");
 }
 
 /** Fotos são recomprimidas como JPEG ao enviar, então a extensão do download acompanha o conteúdo. */
-function nomeParaDownload(a: DocumentoAnexo): string {
+function nomeParaDownload(a: AnexoMinimo): string {
   if (a.previewUrl?.startsWith("data:image/jpeg") && !/\.jpe?g$/i.test(a.nome)) {
     return a.nome.replace(/\.[^.]+$/, "") + ".jpg";
   }
   return a.nome;
 }
 
-function baixar(a: DocumentoAnexo) {
+function baixar(a: AnexoMinimo) {
   if (!a.previewUrl) return;
   const link = document.createElement("a");
   link.href = a.previewUrl;
@@ -49,7 +51,7 @@ function baixar(a: DocumentoAnexo) {
  * Abre a imagem ou o PDF numa janela dentro do app. Os navegadores bloqueiam abrir
  * data URLs direto numa aba nova, por isso não usamos window.open aqui.
  */
-function Visualizador({ anexo, onClose }: { anexo: DocumentoAnexo; onClose: () => void }) {
+export function Visualizador({ anexo, onClose }: { anexo: AnexoMinimo; onClose: () => void }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const imagem = ehImagem(anexo);
   const pdf = ehPdf(anexo);

@@ -43,6 +43,7 @@ import {
 } from "@/lib/types";
 import { formatBRL } from "@/lib/masks";
 import RichTextEditor from "@/components/ui/RichTextEditor";
+import AnotacaoImagens from "./AnotacaoImagens";
 import { useToast } from "@/components/ui/Toast";
 import { fetchAnotacoes, addAnotacao } from "@/lib/firebase/anotacoes";
 import { fetchAtividades, addAtividade, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
@@ -130,6 +131,7 @@ export default function DealDetailPanel({
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
 
   const [anotacoes, setAnotacoes] = useState<Anotacao[]>([]);
+  const [notaImagens, setNotaImagens] = useState<string[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioDoc[]>([]);
@@ -182,16 +184,18 @@ export default function DealDetailPanel({
   }
 
   async function handleSaveNota() {
-    if (!notaValue.trim() || !user) return;
+    if ((!notaValue.trim() && notaImagens.length === 0) || !user) return;
     setSalvandoNota(true);
     try {
       const nova = await addAnotacao(deal!.id, {
         texto: notaValue.trim(),
         autorId: user.id,
         autorNome: user.nome,
+        ...(notaImagens.length ? { imagens: notaImagens } : {}),
       });
       setAnotacoes((prev) => [nova, ...prev]);
       setNotaValue("");
+      setNotaImagens([]);
       showToast("Anotação salva com sucesso");
     } catch (err) {
       console.error(err);
@@ -615,10 +619,15 @@ export default function DealDetailPanel({
                   onChange={setNotaValue}
                   placeholder="Escreva uma anotação sobre este negócio..."
                   rows={4}
+                  imagens={notaImagens}
+                  onImagensChange={setNotaImagens}
                 />
                 <div className="flex items-center justify-end gap-2 mt-2">
                   <button
-                    onClick={() => setNotaValue("")}
+                    onClick={() => {
+                      setNotaValue("");
+                      setNotaImagens([]);
+                    }}
                     className="rounded-lg px-3.5 py-2 text-sm font-medium text-text-gray hover:bg-panel-bg transition-colors"
                   >
                     Cancelar
@@ -645,7 +654,8 @@ export default function DealDetailPanel({
                       <Clock size={12} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-text-dark whitespace-pre-wrap">{a.texto}</p>
+                      {a.texto && <p className="text-[13px] text-text-dark whitespace-pre-wrap">{a.texto}</p>}
+                      <AnotacaoImagens imagens={a.imagens} />
                       <p className="text-[11.5px] text-text-faint mt-1 flex items-center gap-1">
                         <CalendarDays size={11} />
                         {formatDateTime(a.criadoEm)} · {a.autorNome}
@@ -1089,8 +1099,9 @@ function TimelineTab({
                   <p className="text-[12.5px] text-text-dark">
                     <span className="font-semibold">{a.autorNome}</span> às {formatDateTime(a.criadoEm)}
                   </p>
-                  <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark whitespace-pre-wrap shadow-sm">
-                    {a.texto}
+                  <div className="mt-1.5 rounded-lg bg-panel-bg border border-border-soft px-3 py-2 text-[13px] text-text-dark shadow-sm">
+                    {a.texto && <p className="whitespace-pre-wrap">{a.texto}</p>}
+                    <AnotacaoImagens imagens={a.imagens} />
                   </div>
                 </div>
               </div>
