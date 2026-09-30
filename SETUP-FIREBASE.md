@@ -84,14 +84,13 @@ mesma tabela.
 - Clientes e negócios (funil) já são reais no Firestore. Leads **ainda são
   dados fictícios em memória** — próxima frente a migrar.
 
-## Ativar o Firebase Storage (documentos e fotos do negócio)
+## Sobre o Firebase Storage
 
-1. No Firebase Console: menu lateral → **Storage** → **Vamos começar/Get started**.
-2. Escolha o modo de produção (igual fizemos no Firestore) e a mesma região.
-3. Na aba **Regras** do Storage, cole o conteúdo do arquivo `storage.rules`
-   (na raiz do projeto) e publique. *Isso é uma aba separada da regra do
-   Firestore — são dois produtos diferentes, cada um com sua própria tela de
-   regras no Console.*
+Não é usado neste projeto. Fotos de perfil e documentos/fotos de negócio ficam
+guardados direto no Firestore (como arquivo embutido), porque o Storage no
+plano gratuito (Spark) hoje exige vincular uma conta de faturamento mesmo pra
+uso pequeno. Se um dia vocês fizerem upgrade pro plano Blaze, dá pra voltar a
+usar Storage pra arquivos maiores — nesse caso, é só pedir que eu ajusto o código.
 
 ## Importante pra produção
 

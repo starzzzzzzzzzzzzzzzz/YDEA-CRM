@@ -39,12 +39,14 @@ import {
   ATIVIDADE_TIPO_LABEL,
   DealPrioridade,
   Deal,
+  DocumentoAnexo,
 } from "@/lib/types";
 import { formatBRL } from "@/lib/masks";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { useToast } from "@/components/ui/Toast";
 import { fetchAnotacoes, addAnotacao } from "@/lib/firebase/anotacoes";
 import { fetchAtividades, addAtividade, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
+import { fetchDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
 import DocumentUploadGrid from "./DocumentUploadGrid";
 
@@ -129,6 +131,7 @@ export default function DealDetailPanel({
 
   const [anotacoes, setAnotacoes] = useState<Anotacao[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioDoc[]>([]);
   const [novaAtividadeAberta, setNovaAtividadeAberta] = useState(false);
 
@@ -136,6 +139,7 @@ export default function DealDetailPanel({
     if (!dealId) return;
     fetchAnotacoes(dealId).then(setAnotacoes).catch((err) => console.error(err));
     fetchAtividades(dealId).then(setAtividades).catch((err) => console.error(err));
+    fetchDocumentos(dealId).then(setDocumentos).catch((err) => console.error(err));
     fetchAllUsuarios().then(setUsuarios).catch((err) => console.error(err));
   }, [dealId]);
 
@@ -559,10 +563,10 @@ export default function DealDetailPanel({
                 }
               >
                 {showDocumentos ? (
-                  <DocumentosDoNegocio dealId={deal.id} />
+                  <DocumentUploadGrid dealId={deal.id} documentos={documentos} onChange={setDocumentos} />
                 ) : (
                   <p className="text-[12px] text-text-faint">
-                    {(deal.documentos?.length ?? 0)} arquivo(s) anexado(s)
+                    {documentos.length} arquivo(s) anexado(s)
                   </p>
                 )}
               </SidebarCard>
@@ -693,19 +697,6 @@ export default function DealDetailPanel({
         </div>
       )}
     </div>
-  );
-}
-
-function DocumentosDoNegocio({ dealId }: { dealId: string }) {
-  const { deals, updateDeal } = useCrmData();
-  const deal = deals.find((d) => d.id === dealId);
-  if (!deal) return null;
-  return (
-    <DocumentUploadGrid
-      dealId={dealId}
-      documentos={deal.documentos ?? []}
-      onChange={(docs) => updateDeal(dealId, { documentos: docs })}
-    />
   );
 }
 

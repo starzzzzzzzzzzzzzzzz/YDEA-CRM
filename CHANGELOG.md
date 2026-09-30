@@ -4,6 +4,29 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v15 — Upload de documentos e fotos do negócio, consertado de vez
+
+**O bug:** anexar um documento/foto num negócio "subia" sem erro, mas nunca aparecia depois. Causa raiz: o Firebase Storage, no plano gratuito (Spark), hoje exige vincular uma conta de faturamento mesmo pra guardar arquivos pequenos — então o upload ficava travado num limbo sem avisar.
+
+**A correção:** apliquei a mesma solução que já usávamos pra foto de perfil — documentos e fotos agora ficam guardados **direto no Firestore**, como imagem/arquivo embutido, sem depender do Storage:
+- Fotos são redimensionadas e comprimidas automaticamente antes de salvar (cabem tranquilamente no limite do Firestore).
+- Outros arquivos (PDF, etc.) têm um limite de ~700KB — acima disso, aparece um aviso claro pedindo um arquivo menor (não dá pra comprimir um PDF do mesmo jeito, e sem Storage o limite de 1MB por documento do banco passa a valer).
+- Documentos de cada negócio agora vivem numa subcoleção própria (`deals/{id}/documentos`), igual Anotações e Atividades — mais organizado e sem risco de estourar o tamanho do negócio em si.
+
+**O que mudou por baixo:**
+- Novo `lib/fileToDataUrl.ts` — converte arquivo em data URL (com compressão de imagem).
+- Novo `lib/firebase/documentos.ts` — CRUD da subcoleção.
+- `DocumentUploadGrid.tsx` reescrito pra usar esse fluxo.
+- `DealDetailPanel.tsx`: documentos passaram a ser buscados/guardados como os demais dados do negócio (Anotações, Atividades), não mais como campo solto do negócio.
+- **Removido o Firebase Storage do projeto inteiro** (`lib/firebase/storage.ts`, `storage.rules`, e a inicialização em `config.ts`) — não tinha mais nada usando, já que a foto de perfil também não depende dele.
+- Nova regra no Firestore pra subcoleção `documentos`.
+
+**O que ainda falta (conhecido, não é bug novo):**
+- Anexar arquivo **durante a criação** de um negócio novo continua sendo só um preview local (não persiste) — esse gap já existia antes e segue o mesmo motivo: o negócio ainda não tem um ID até ser salvo. Persistir isso também é uma melhoria futura possível.
+- Se algum dia vocês fizerem upgrade pro plano Blaze do Firebase, dá pra voltar a usar o Storage pra arquivos maiores (PDFs grandes, vídeos) — me avisem quando isso acontecer que ajusto.
+
+---
+
 ## v14 — Cabeçalhos de página consistentes + estado vazio melhor em Clientes
 
 **O que esta versão faz:**

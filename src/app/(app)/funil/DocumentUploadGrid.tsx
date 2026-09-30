@@ -3,7 +3,9 @@
 import { useRef, useState } from "react";
 import { Upload, Eye, Trash2, FileText, Loader2 } from "lucide-react";
 import { DocumentoAnexo, DocumentoTipo, DOCUMENTO_LABEL } from "@/lib/types";
-import { uploadDocumento, deleteDocumento } from "@/lib/firebase/storage";
+import { arquivoParaDataUrl } from "@/lib/fileToDataUrl";
+import { addDocumento, removeDocumento } from "@/lib/firebase/documentos";
+import { useToast } from "@/components/ui/Toast";
 
 const DOC_TYPES: DocumentoTipo[] = [
   "conta_energia",
@@ -98,7 +100,7 @@ function DocCard({
               key={a.id}
               className="flex items-center gap-2 bg-card-bg border border-border-soft rounded-lg px-2 py-1.5"
             >
-              {a.previewUrl ? (
+              {a.previewUrl?.startsWith("data:image") ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={a.previewUrl} alt={a.nome} className="h-7 w-7 rounded object-cover shrink-0" />
               ) : (
@@ -141,12 +143,13 @@ export default function DocumentUploadGrid({
   documentos,
   onChange,
 }: {
-  /** Quando fornecido, os arquivos sobem de verdade pro Firebase Storage (deals/{dealId}/...).
+  /** Quando fornecido, os arquivos são salvos de verdade no Firestore (deals/{dealId}/documentos).
    * Sem isso (ex.: criando um negócio novo que ainda não tem id), fica só como preview local. */
   dealId?: string;
   documentos: DocumentoAnexo[];
   onChange: (docs: DocumentoAnexo[]) => void;
 }) {
+  const { showToast } = useToast();
   const [uploadingTipo, setUploadingTipo] = useState<DocumentoTipo | null>(null);
 
   async function handleAdd(tipo: DocumentoTipo, files: FileList) {
@@ -165,25 +168,35 @@ export default function DocumentUploadGrid({
 
     setUploadingTipo(tipo);
     try {
-      const enviados = await Promise.all(
-        Array.from(files).map((f) => uploadDocumento(dealId, f, tipo))
-      );
-      onChange([...documentos, ...enviados]);
-    } catch (err) {
-      console.error("Erro ao enviar arquivo pro Storage:", err);
+      const enviados: DocumentoAnexo[] = [];
+      for (const file of Array.from(files)) {
+        try {
+          const dataUrl = await arquivoParaDataUrl(file);
+          const salvo = await addDocumento(dealId, {
+            tipo,
+            nome: file.name,
+            tamanho: file.size,
+            previewUrl: dataUrl,
+          });
+          enviados.push(salvo);
+        } catch (err) {
+          console.error(err);
+          showToast(err instanceof Error ? err.message : `Não foi possível enviar ${file.name}`, "info");
+        }
+      }
+      if (enviados.length > 0) onChange([...documentos, ...enviados]);
     } finally {
       setUploadingTipo(null);
     }
   }
 
   async function handleRemove(id: string) {
-    const doc = documentos.find((d) => d.id === id);
     onChange(documentos.filter((d) => d.id !== id));
-    if (doc?.storagePath) {
+    if (dealId) {
       try {
-        await deleteDocumento(doc.storagePath);
+        await removeDocumento(dealId, id);
       } catch (err) {
-        console.error("Erro ao excluir arquivo do Storage:", err);
+        console.error("Erro ao excluir documento do Firestore:", err);
       }
     }
   }

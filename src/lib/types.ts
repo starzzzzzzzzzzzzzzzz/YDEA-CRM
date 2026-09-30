@@ -104,9 +104,8 @@ export type DocumentoAnexo = {
   tipo: DocumentoTipo;
   nome: string;
   tamanho: number;
+  /** Data URL (base64) do arquivo — guardado direto no Firestore, sem Storage. */
   previewUrl?: string;
-  /** Caminho no Firebase Storage — necessário pra poder excluir o arquivo depois. */
-  storagePath?: string;
   uploadedAt?: string;
 };
 
