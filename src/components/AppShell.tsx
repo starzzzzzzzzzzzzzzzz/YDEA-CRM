@@ -8,7 +8,6 @@ import {
   Contact,
   BookUser,
   Filter,
-  Wrench,
   Users,
   Calendar,
   Sparkles,
@@ -42,7 +41,6 @@ const NAV = [
   { href: "/leads", label: "Leads", icon: Contact, active: true, permissaoId: "menu.leads" },
   { href: "/clientes", label: "Clientes", icon: BookUser, active: true, permissaoId: "menu.clientes" },
   { href: "/funil", label: "Funil", icon: Filter, active: true, permissaoId: "menu.funil" },
-  { href: "/instalacoes", label: "Instalações", icon: Wrench, active: true, permissaoId: "menu.instalacoes" },
   { href: "/usuarios", label: "Equipe", icon: Users, active: true, permissaoId: "menu.usuarios" },
   { href: "#", label: "Atividades", icon: Calendar, active: false, permissaoId: "" },
   { href: "#", label: "IA", icon: Sparkles, active: false, permissaoId: "" },
@@ -54,7 +52,6 @@ const TITLES: Record<string, string> = {
   "/leads": "Leads",
   "/clientes": "Clientes",
   "/funil": "Funil",
-  "/instalacoes": "Instalações",
   "/usuarios": "Equipe",
 };
 

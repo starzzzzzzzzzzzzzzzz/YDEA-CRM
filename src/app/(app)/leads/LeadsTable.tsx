@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, Plus, Zap, Download } from "lucide-react";
 import { Lead, LeadTipo, STAGES, StageId, TIPO_LABEL } from "@/lib/types";
 import { useCrmData } from "@/lib/store/CrmDataContext";
-import NewLeadModal from "../instalacoes/NewLeadModal";
+import NewLeadModal from "./NewLeadModal";
 
 const TAG_STYLES: Record<string, string> = {
   urgente: "bg-badge-red-bg text-badge-red-text",
