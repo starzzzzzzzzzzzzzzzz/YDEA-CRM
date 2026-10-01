@@ -18,6 +18,7 @@ import { fetchClientes, createCliente } from "@/lib/firebase/clientes";
 import {
   fetchDeals,
   createDeal,
+  AnexosFalharam,
   updateDealDoc,
   deleteDeal as deleteDealDoc,
   duplicateDeal as duplicateDealDoc,
@@ -171,9 +172,15 @@ export function CrmDataProvider({
   }
 
   async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
-    const criado = await createDeal(deal);
-    setDeals((prev) => [criado, ...prev]);
-    return criado;
+    try {
+      const criado = await createDeal(deal);
+      setDeals((prev) => [criado, ...prev]);
+      return criado;
+    } catch (err) {
+      // Negócio criado, mas algum anexo falhou: ele precisa aparecer na lista mesmo assim.
+      if (err instanceof AnexosFalharam) setDeals((prev) => [err.deal, ...prev]);
+      throw err;
+    }
   }
 
   function updateDeal(id: string, patch: Partial<Deal>) {

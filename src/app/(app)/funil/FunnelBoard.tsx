@@ -307,8 +307,12 @@ export default function FunnelBoard() {
   }
 
   async function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">) {
-    await addDeal(newDeal);
-    setModalOpen(false);
+    try {
+      await addDeal(newDeal);
+    } finally {
+      // Fecha mesmo se algum anexo falhar: o negócio já foi criado (evita duplicar ao clicar de novo).
+      setModalOpen(false);
+    }
   }
 
   function handleDuplicateRequest(deal: Deal) {
@@ -317,7 +321,13 @@ export default function FunnelBoard() {
   }
 
   async function handleCreateDuplicate(newDeal: Omit<Deal, "id" | "createdAt">) {
-    const criado = await addDeal(newDeal);
+    let criado: Deal;
+    try {
+      criado = await addDeal(newDeal);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AnexosFalharam") setDuplicatingDeal(null);
+      throw err;
+    }
     // O formulário de "novo negócio" não edita esses campos — copiamos do
     // original manualmente pra "Duplicar negócio" não perder essa informação.
     if (duplicatingDeal) {

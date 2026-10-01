@@ -346,16 +346,8 @@ export default function NewDealModal({
   }
 
   function buildDeal(): Omit<Deal, "id" | "createdAt"> {
-    // Garante a presença dos documentos validados
-    const docsValidados = documentos.map((d) => ({
-      id: d.id,
-      categoria: d.categoria,
-      nome: d.nome,
-      url: d.url ?? "",
-      tamanho: d.tamanho ?? 0,
-      tipo: d.tipo ?? "application/octet-stream",
-      criadoEm: d.criadoEm ?? new Date().toISOString(),
-    }));
+    // Os anexos seguem como estão (com previewUrl); quem grava na subcoleção é o createDeal.
+    const docsValidados = documentos.filter((d) => !!d.previewUrl);
 
     return {
       titulo: form.titulo.trim(),
@@ -421,16 +413,22 @@ export default function NewDealModal({
     setSubmitting(generateProposal ? "proposal" : "create");
 
     try {
-      localStorage.removeItem(draftKey(funnel.id));
       const dealData = buildDeal();
       await onCreate(dealData);
+      localStorage.removeItem(draftKey(funnel.id));
 
       showToast(
         generateProposal ? "Negócio criado — gerando proposta..." : "Negócio criado com sucesso"
       );
     } catch (err) {
       console.error("Erro ao criar negócio:", err);
-      showToast("Erro ao criar negócio com anexos", "error");
+      if (err instanceof Error && err.name === "AnexosFalharam") {
+        // O negócio foi criado; só alguns anexos falharam — o rascunho já não faz sentido.
+        localStorage.removeItem(draftKey(funnel.id));
+        showToast(err.message, "info");
+      } else {
+        showToast("Erro ao criar negócio", "error");
+      }
     } finally {
       setSubmitting(null);
     }

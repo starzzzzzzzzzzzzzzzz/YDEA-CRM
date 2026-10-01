@@ -12,7 +12,8 @@ import {
 } from "firebase/firestore";
 import { db } from "./config";
 import { stripUndefined } from "./utils";
-import { Deal } from "@/lib/types";
+import { Deal, DocumentoAnexo } from "@/lib/types";
+import { addDocumento } from "./documentos";
 
 const COLLECTION = "deals";
 
@@ -27,51 +28,71 @@ export async function fetchDeal(id: string): Promise<Deal | null> {
   return snap.exists() ? { id: snap.id, ...(snap.data() as Omit<Deal, "id">) } : null;
 }
 
+/**
+ * Cria o negócio em 2 etapas:
+ * 1. grava o negócio SEM os anexos (evita estourar o limite de 1MB do documento);
+ * 2. com o id novo, grava cada anexo na subcoleção deals/{id}/documentos —
+ *    o mesmo caminho que a aba "Documentos e fotos" do negócio já usa.
+ * Se algum anexo falhar, o negócio continua criado e o erro é lançado em
+ * `AnexosFalharam` para a tela avisar o usuário.
+ */
+export class AnexosFalharam extends Error {
+  deal: Deal;
+  falhas: string[];
+  constructor(deal: Deal, falhas: string[]) {
+    super(`Negócio criado, mas ${falhas.length} anexo(s) não foram salvos: ${falhas.join(", ")}`);
+    this.name = "AnexosFalharam";
+    this.deal = deal;
+    this.falhas = falhas;
+  }
+}
+
 export async function createDeal(dados: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
   const createdAt = new Date().toISOString().slice(0, 10);
 
-  // 1. Tratamento e sanitização profunda para documentos/fotos anexados
-  const dadosSanitizados = { ...dados };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { documentos, ...dadosSemAnexos } = dados;
 
-  if (Array.isArray((dadosSanitizados as any).documentos)) {
-    (dadosSanitizados as any).documentos = (dadosSanitizados as any).documentos.map((docAnexo: any) =>
-      stripUndefined({
-        nome: docAnexo.nome ?? "",
-        url: docAnexo.url ?? null,
-        tipo: docAnexo.tipo ?? null,
-        tamanho: docAnexo.tamanho ?? 0,
-        createdAt: docAnexo.createdAt ?? new Date().toISOString(),
-      })
-    );
-  }
-
-  // 2. Limpeza global do payload para o Firestore
   const payload = stripUndefined({
-    ...dadosSanitizados,
+    ...dadosSemAnexos,
     createdAt,
     _createdAt: serverTimestamp(),
   });
 
   const ref = await addDoc(collection(db, COLLECTION), payload);
-  return { id: ref.id, ...dados, createdAt };
+  const criado: Deal = { id: ref.id, ...dadosSemAnexos, createdAt };
+
+  if (documentos?.length) {
+    const salvos: DocumentoAnexo[] = [];
+    const falhas: string[] = [];
+    for (const d of documentos) {
+      if (!d.previewUrl) continue;
+      try {
+        salvos.push(
+          await addDocumento(ref.id, {
+            tipo: d.tipo,
+            nome: d.nome,
+            tamanho: d.tamanho,
+            previewUrl: d.previewUrl,
+          })
+        );
+      } catch (err) {
+        console.error(`Erro ao salvar anexo ${d.nome}:`, err);
+        falhas.push(d.nome);
+      }
+    }
+    criado.documentos = salvos;
+    if (falhas.length) throw new AnexosFalharam(criado, falhas);
+  }
+
+  return criado;
 }
 
 export async function updateDealDoc(id: string, patch: Partial<Deal>): Promise<void> {
-  const patchSanitizado = { ...patch };
-
-  if (Array.isArray((patchSanitizado as any).documentos)) {
-    (patchSanitizado as any).documentos = (patchSanitizado as any).documentos.map((docAnexo: any) =>
-      stripUndefined({
-        nome: docAnexo.nome ?? "",
-        url: docAnexo.url ?? null,
-        tipo: docAnexo.tipo ?? null,
-        tamanho: docAnexo.tamanho ?? 0,
-        createdAt: docAnexo.createdAt ?? new Date().toISOString(),
-      })
-    );
-  }
-
-  await updateDoc(doc(db, COLLECTION, id), stripUndefined(patchSanitizado));
+  // Anexos vivem na subcoleção deals/{id}/documentos — nunca no documento principal.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { documentos, ...resto } = patch;
+  await updateDoc(doc(db, COLLECTION, id), stripUndefined(resto));
 }
 
 export async function deleteDeal(id: string): Promise<void> {
@@ -81,6 +102,6 @@ export async function deleteDeal(id: string): Promise<void> {
 /** Duplica um negócio: copia os campos principais (não leva anotações/atividades). */
 export async function duplicateDeal(original: Deal): Promise<Deal> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id, createdAt, status, motivoPerda, fechadoEm, ...rest } = original;
+  const { id, createdAt, status, motivoPerda, fechadoEm, documentos, ...rest } = original;
   return createDeal({ ...rest, titulo: `${original.titulo} (cópia)`, status: "aberto" });
 }
