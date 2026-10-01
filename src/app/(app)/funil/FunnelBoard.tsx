@@ -219,6 +219,23 @@ export default function FunnelBoard() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  // Sino de notificações: abre o negócio pedido, seja chegando em /funil?negocio=ID
+  // ou por evento quando o funil já está aberto.
+  useEffect(() => {
+    const idDaUrl = new URLSearchParams(window.location.search).get("negocio");
+    if (idDaUrl) {
+      abrirDeal(idDaUrl);
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+    }
+    function handleAbrirNegocio(e: Event) {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) abrirDeal(id);
+    }
+    window.addEventListener("abrir-negocio", handleAbrirNegocio);
+    return () => window.removeEventListener("abrir-negocio", handleAbrirNegocio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Bold, Italic, List, Link2, Image as ImageIcon, Loader2, X } from "lucide-react";
+import { Bold, Italic, List, Link2, AtSign, Image as ImageIcon, Loader2, X } from "lucide-react";
 import { fotoParaDataUrl } from "@/lib/fileToDataUrl";
 import { useToast } from "@/components/ui/Toast";
 
@@ -16,6 +16,9 @@ export default function RichTextEditor({
   rows = 6,
   imagens = [],
   onImagensChange,
+  mencionaveis,
+  mencoes = [],
+  onMencoesChange,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -24,11 +27,72 @@ export default function RichTextEditor({
   /** Fotos anexadas (data URLs). Só aparecem se `onImagensChange` for passado. */
   imagens?: string[];
   onImagensChange?: (imagens: string[]) => void;
+  /** Colaboradores que podem ser marcados digitando @. */
+  mencionaveis?: { id: string; nome: string }[];
+  /** Marcados até agora (o pai filtra quem ainda está no texto ao salvar). */
+  mencoes?: { id: string; nome: string }[];
+  onMencoesChange?: (mencoes: { id: string; nome: string }[]) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [lendo, setLendo] = useState(false);
   const { showToast } = useToast();
+  const [sugestao, setSugestao] = useState<{ inicio: number; consulta: string } | null>(null);
+  const [indice, setIndice] = useState(0);
+  const podeMarcar = !!mencionaveis?.length && !!onMencoesChange;
+
+  function normalizar(t: string) {
+    return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  const opcoes =
+    sugestao && podeMarcar
+      ? mencionaveis!
+          .filter((u) => normalizar(u.nome).includes(normalizar(sugestao.consulta)))
+          .slice(0, 5)
+      : [];
+
+  function atualizarSugestao(texto: string, cursor: number) {
+    if (!podeMarcar) return;
+    const m = /(^|\s)@([^\s@]*)$/.exec(texto.slice(0, cursor));
+    if (!m) {
+      setSugestao(null);
+      return;
+    }
+    setSugestao({ inicio: cursor - m[2].length - 1, consulta: m[2] });
+    setIndice(0);
+  }
+
+  function escolherMencao(u: { id: string; nome: string }) {
+    const el = ref.current;
+    if (!el || !sugestao) return;
+    const inserido = `@${u.nome} `;
+    const next = value.slice(0, sugestao.inicio) + inserido + value.slice(el.selectionStart);
+    onChange(next);
+    if (!mencoes.some((x) => x.id === u.id)) onMencoesChange?.([...mencoes, u]);
+    const pos = sugestao.inicio + inserido.length;
+    setSugestao(null);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  function inserirArroba() {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const precisaEspaco = start > 0 && !/\s/.test(value[start - 1]);
+    const insert = `${precisaEspaco ? " " : ""}@`;
+    const next = value.slice(0, start) + insert + value.slice(start);
+    const cursor = start + insert.length;
+    onChange(next);
+    atualizarSugestao(next, cursor);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(cursor, cursor);
+    });
+  }
 
   function wrapSelection(prefix: string, suffix = prefix, placeholderText = "") {
     const el = ref.current;
@@ -111,6 +175,11 @@ export default function RichTextEditor({
         <button type="button" title="Link" onClick={insertLink} className={toolBtn}>
           <Link2 size={14} />
         </button>
+        {podeMarcar && (
+          <button type="button" title="Marcar colaborador" onClick={inserirArroba} className={toolBtn}>
+            <AtSign size={14} />
+          </button>
+        )}
         {onImagensChange && (
           <>
             <button
@@ -140,7 +209,27 @@ export default function RichTextEditor({
         ref={ref}
         value={value}
         rows={rows}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          atualizarSugestao(e.target.value, e.target.selectionStart);
+        }}
+        onKeyDown={(e) => {
+          if (!sugestao || opcoes.length === 0) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setIndice((i) => (i + 1) % opcoes.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setIndice((i) => (i - 1 + opcoes.length) % opcoes.length);
+          } else if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            escolherMencao(opcoes[indice]);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setSugestao(null);
+          }
+        }}
+        onBlur={() => setSugestao(null)}
         onPaste={(e) => {
           if (!onImagensChange) return;
           const fotos = Array.from(e.clipboardData.files).filter((f: File) => f.type.startsWith("image/"));
@@ -151,6 +240,26 @@ export default function RichTextEditor({
         placeholder={placeholder}
         className="w-full bg-transparent px-3.5 py-3 text-sm text-text-dark placeholder:text-text-faint outline-none resize-y"
       />
+      {sugestao && opcoes.length > 0 && (
+        <div className="border-t border-border-soft bg-card-bg py-1">
+          <p className="px-3 py-1 text-[11px] text-text-faint">Marcar colaborador</p>
+          {opcoes.map((u, i) => (
+            <button
+              key={u.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                escolherMencao(u);
+              }}
+              className={`w-full text-left px-3 py-1.5 text-[12.5px] transition-colors ${
+                i === indice ? "bg-brand-soft text-brand-strong" : "text-text-dark hover:bg-panel-bg"
+              }`}
+            >
+              @{u.nome}
+            </button>
+          ))}
+        </div>
+      )}
       {imagens.length > 0 && (
         <div className="flex flex-wrap gap-2 px-3 pt-2 pb-3">
           {imagens.map((src, i) => (

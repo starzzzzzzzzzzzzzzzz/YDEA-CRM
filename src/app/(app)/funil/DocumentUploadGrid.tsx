@@ -29,7 +29,6 @@ function ehPdf(a: AnexoMinimo): boolean {
   return !!a.previewUrl?.startsWith("data:application/pdf");
 }
 
-/** Fotos são recomprimidas como JPEG ao enviar, então a extensão do download acompanha o conteúdo. */
 function nomeParaDownload(a: AnexoMinimo): string {
   if (a.previewUrl?.startsWith("data:image/jpeg") && !/\.jpe?g$/i.test(a.nome)) {
     return a.nome.replace(/\.[^.]+$/, "") + ".jpg";
@@ -47,10 +46,6 @@ function baixar(a: AnexoMinimo) {
   link.remove();
 }
 
-/**
- * Abre a imagem ou o PDF numa janela dentro do app. Os navegadores bloqueiam abrir
- * data URLs direto numa aba nova, por isso não usamos window.open aqui.
- */
 export function Visualizador({ anexo, onClose }: { anexo: AnexoMinimo; onClose: () => void }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const imagem = ehImagem(anexo);
@@ -280,8 +275,6 @@ export default function DocumentUploadGrid({
   documentos,
   onChange,
 }: {
-  /** Quando fornecido, os arquivos são salvos de verdade no Firestore (deals/{dealId}/documentos).
-   * Sem isso (ex.: criando um negócio novo que ainda não tem id), fica só como preview local. */
   dealId?: string;
   documentos: DocumentoAnexo[];
   onChange: (docs: DocumentoAnexo[]) => void;
@@ -291,21 +284,25 @@ export default function DocumentUploadGrid({
   const [visualizando, setVisualizando] = useState<DocumentoAnexo | null>(null);
 
   async function handleAdd(tipo: DocumentoTipo, files: FileList) {
-    if (!dealId) {
-      // Sem negócio salvo ainda: só guarda um preview local (blob), não persiste.
-      const novos: DocumentoAnexo[] = Array.from(files).map((f) => ({
-        id: `doc${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-        tipo,
-        nome: f.name,
-        tamanho: f.size,
-        previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
-      }));
-      onChange([...documentos, ...novos]);
-      return;
-    }
-
     setUploadingTipo(tipo);
     try {
+      if (!dealId) {
+        // Converte cada ficheiro para DataURL (base64) para poder ser persistido no Firestore
+        const novos: DocumentoAnexo[] = [];
+        for (const f of Array.from(files)) {
+          const dataUrl = await arquivoParaDataUrl(f);
+          novos.push({
+            id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            tipo,
+            nome: f.name,
+            tamanho: f.size,
+            previewUrl: dataUrl,
+          });
+        }
+        onChange([...documentos, ...novos]);
+        return;
+      }
+
       const enviados: DocumentoAnexo[] = [];
       for (const file of Array.from(files)) {
         try {
@@ -343,17 +340,17 @@ export default function DocumentUploadGrid({
     <>
       <div className="@container">
         <div className="grid grid-cols-1 @xl:grid-cols-2 @3xl:grid-cols-3 gap-3">
-        {DOC_TYPES.map((tipo) => (
-          <DocCard
-            key={tipo}
-            tipo={tipo}
-            arquivos={documentos.filter((d) => d.tipo === tipo)}
-            uploading={uploadingTipo === tipo}
-            onAdd={(files) => handleAdd(tipo, files)}
-            onRemove={handleRemove}
-            onView={setVisualizando}
-          />
-        ))}
+          {DOC_TYPES.map((tipo) => (
+            <DocCard
+              key={tipo}
+              tipo={tipo}
+              arquivos={documentos.filter((d) => d.tipo === tipo)}
+              uploading={uploadingTipo === tipo}
+              onAdd={(files) => handleAdd(tipo, files)}
+              onRemove={handleRemove}
+              onView={setVisualizando}
+            />
+          ))}
         </div>
       </div>
 

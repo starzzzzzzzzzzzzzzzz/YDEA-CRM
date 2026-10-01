@@ -118,6 +118,8 @@ export type Anotacao = {
   criadoEm: string; // ISO datetime
   /** Fotos anexadas (data URL JPEG comprimido), guardadas direto no Firestore. */
   imagens?: string[];
+  /** UIDs dos colaboradores marcados com @ nesta anotação. */
+  mencoes?: string[];
 };
 
 export type AtividadeTipo = "ligacao" | "reuniao" | "visita" | "email" | "tarefa" | "whatsapp";

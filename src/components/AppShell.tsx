@@ -16,7 +16,6 @@ import {
   Settings,
   HelpCircle,
   Search,
-  Bell,
   Grid3x3,
   ChevronDown,
   Plus,
@@ -28,6 +27,7 @@ import {
   Sun,
 } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
+import NotificacoesBell from "@/components/NotificacoesBell";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
 import { useTheme } from "@/lib/store/ThemeContext";
@@ -170,13 +170,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              className="relative h-9 w-9 rounded-lg flex items-center justify-center text-text-gray hover:bg-panel-bg hover:text-text-dark transition-colors"
-              aria-label="Notificações"
-            >
-              <Bell size={16} />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-brand" />
-            </button>
+            <NotificacoesBell />
             <button
               className="h-9 w-9 rounded-lg flex items-center justify-center text-text-gray hover:bg-panel-bg hover:text-text-dark transition-colors"
               aria-label="Aplicativos"

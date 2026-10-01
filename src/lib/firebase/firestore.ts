@@ -24,17 +24,36 @@ export type UsuarioDoc = {
 
 export async function fetchUsuario(uid: string): Promise<UsuarioDoc | null> {
   const snap = await getDoc(doc(db, "usuarios", uid));
-  return snap.exists() ? (snap.data() as UsuarioDoc) : null;
+  if (!snap.exists()) return null;
+
+  const data = snap.data() as UsuarioDoc;
+  return {
+    ...data,
+    sobrenome: data.sobrenome ?? "",
+    telefone: data.telefone ?? "",
+    fotoUrl: data.fotoUrl ?? "",
+    unidadeId: data.unidadeId ?? "",
+  };
 }
 
 export async function fetchAllUsuarios(): Promise<(UsuarioDoc & { id: string })[]> {
   const snap = await getDocs(collection(db, "usuarios"));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as UsuarioDoc) }));
+  return snap.docs.map((d) => {
+    const data = d.data() as UsuarioDoc;
+    return {
+      id: d.id,
+      ...data,
+      sobrenome: data.sobrenome ?? "",
+      telefone: data.telefone ?? "",
+      fotoUrl: data.fotoUrl ?? "",
+      unidadeId: data.unidadeId ?? "",
+    };
+  });
 }
 
 /** Admin muda o cargo de alguém. */
 export async function atualizarCargoUsuario(usuarioId: string, cargoId: CargoId): Promise<void> {
-  await updateDoc(doc(db, "usuarios", usuarioId), { cargoId });
+  await updateDoc(doc(db, "usuarios", usuarioId), stripUndefined({ cargoId }));
 }
 
 /** Campos que o próprio usuário pode editar no "Configurações de perfil". */
@@ -42,5 +61,10 @@ export type PerfilEditavel = Partial<Pick<UsuarioDoc, "nome" | "sobrenome" | "te
 
 /** Usuário edita os próprios dados (nome, sobrenome, telefone, foto) — cargo fica de fora, só admin mexe. */
 export async function atualizarPerfilUsuario(usuarioId: string, patch: PerfilEditavel): Promise<void> {
-  await updateDoc(doc(db, "usuarios", usuarioId), stripUndefined(patch));
+  const payloadSeguro = stripUndefined(patch);
+
+  // Evita fazer a requisição se nenhum campo válido foi alterado
+  if (Object.keys(payloadSeguro).length === 0) return;
+
+  await updateDoc(doc(db, "usuarios", usuarioId), payloadSeguro);
 }

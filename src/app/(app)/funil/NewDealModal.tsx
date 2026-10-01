@@ -206,7 +206,7 @@ export default function NewDealModal({
   /** Quando informado, o formulário abre pré-preenchido com estes dados — usado por "Duplicar negócio". */
   initialDeal?: Deal;
   onClose: () => void;
-  onCreate: (deal: Omit<Deal, "id" | "createdAt">) => void;
+  onCreate: (deal: Omit<Deal, "id" | "createdAt">) => void | Promise<void>;
 }) {
   const { showToast } = useToast();
   const { organizacoes, pessoas, addOrganizacao, addPessoa, currentUser } = useCrmData();
@@ -237,7 +237,7 @@ export default function NewDealModal({
     const pessoaId = initialDeal?.pessoaId ?? draft?.pessoaId;
     return (pessoaId && pessoas.find((p) => p.id === pessoaId)) || null;
   });
-  const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoAnexo[]>(() => initialDeal?.documentos ?? []);
   const [form, setForm] = useState<FormState>(() =>
     initialDeal
       ? formFromDeal(initialDeal, funnel)
@@ -259,7 +259,7 @@ export default function NewDealModal({
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
-  // --- Notify about a restored draft (state was already loaded synchronously above) ---
+  // --- Notify about a restored draft ---
   useEffect(() => {
     if (draft && !draftNoticeShown.current) {
       draftNoticeShown.current = true;
@@ -277,13 +277,12 @@ export default function NewDealModal({
   // --- Autosave every 4s while there's meaningful content ---
   useEffect(() => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    if (initialDeal) return; // duplicando — não sobrescreve o rascunho de "novo negócio" desse funil
+    if (initialDeal) return;
     if (!form.titulo.trim() && !organizacao && !pessoa) return;
     autosaveTimer.current = setTimeout(persistDraft, 4000);
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, organizacao, pessoa]);
 
   // --- Keyboard shortcut: Ctrl/Cmd + S ---
@@ -347,6 +346,17 @@ export default function NewDealModal({
   }
 
   function buildDeal(): Omit<Deal, "id" | "createdAt"> {
+    // Garante a presença dos documentos validados
+    const docsValidados = documentos.map((d) => ({
+      id: d.id,
+      categoria: d.categoria,
+      nome: d.nome,
+      url: d.url ?? "",
+      tamanho: d.tamanho ?? 0,
+      tipo: d.tipo ?? "application/octet-stream",
+      criadoEm: d.criadoEm ?? new Date().toISOString(),
+    }));
+
     return {
       titulo: form.titulo.trim(),
       valor: currencyDigitsToNumber(form.valorDigits),
@@ -387,7 +397,7 @@ export default function NewDealModal({
       trocaTitularidade: form.trocaTitularidade,
       validadeProposta: form.validadeProposta || undefined,
 
-      documentos: documentos.length ? documentos : undefined,
+      documentos: docsValidados.length ? docsValidados : undefined,
       observacoes: form.observacoes || undefined,
     };
   }
@@ -402,20 +412,28 @@ export default function NewDealModal({
     }, 400);
   }
 
-  function handleCreate(generateProposal = false) {
+  async function handleCreate(generateProposal = false) {
     if (!validate()) {
       showToast("Revise os campos obrigatórios destacados", "error");
       return;
     }
+
     setSubmitting(generateProposal ? "proposal" : "create");
-    setTimeout(() => {
+
+    try {
       localStorage.removeItem(draftKey(funnel.id));
-      onCreate(buildDeal());
-      setSubmitting(null);
+      const dealData = buildDeal();
+      await onCreate(dealData);
+
       showToast(
         generateProposal ? "Negócio criado — gerando proposta..." : "Negócio criado com sucesso"
       );
-    }, 600);
+    } catch (err) {
+      console.error("Erro ao criar negócio:", err);
+      showToast("Erro ao criar negócio com anexos", "error");
+    } finally {
+      setSubmitting(null);
+    }
   }
 
   return (

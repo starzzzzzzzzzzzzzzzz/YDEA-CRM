@@ -44,6 +44,7 @@ import {
 import { formatBRL } from "@/lib/masks";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import AnotacaoImagens from "./AnotacaoImagens";
+import { criarNotificacoesMencao } from "@/lib/firebase/notificacoes";
 import { useToast } from "@/components/ui/Toast";
 import { fetchAnotacoes, addAnotacao } from "@/lib/firebase/anotacoes";
 import { fetchAtividades, addAtividade, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
@@ -132,9 +133,10 @@ export default function DealDetailPanel({
 
   const [anotacoes, setAnotacoes] = useState<Anotacao[]>([]);
   const [notaImagens, setNotaImagens] = useState<string[]>([]);
+  const [notaMencoes, setNotaMencoes] = useState<{ id: string; nome: string }[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
-  const [usuarios, setUsuarios] = useState<UsuarioDoc[]>([]);
+  const [usuarios, setUsuarios] = useState<(UsuarioDoc & { id: string })[]>([]);
   const [novaAtividadeAberta, setNovaAtividadeAberta] = useState(false);
 
   useEffect(() => {
@@ -187,15 +189,32 @@ export default function DealDetailPanel({
     if ((!notaValue.trim() && notaImagens.length === 0) || !user) return;
     setSalvandoNota(true);
     try {
+      // Só vale quem ainda está escrito no texto (a pessoa pode ter apagado o @nome) e não é a própria autora.
+      const idsMarcados = notaMencoes
+        .filter((m) => notaValue.includes(`@${m.nome}`) && m.id !== user.id)
+        .map((m) => m.id);
       const nova = await addAnotacao(deal!.id, {
         texto: notaValue.trim(),
         autorId: user.id,
         autorNome: user.nome,
         ...(notaImagens.length ? { imagens: notaImagens } : {}),
+        ...(idsMarcados.length ? { mencoes: idsMarcados } : {}),
       });
       setAnotacoes((prev) => [nova, ...prev]);
+      if (idsMarcados.length) {
+        criarNotificacoesMencao({
+          destinatarios: idsMarcados,
+          dealId: deal!.id,
+          dealTitulo: deal!.titulo,
+          anotacaoId: nova.id,
+          autorId: user.id,
+          autorNome: user.nome,
+          texto: notaValue.trim(),
+        }).catch((err) => console.error("Erro ao notificar os colaboradores marcados:", err));
+      }
       setNotaValue("");
       setNotaImagens([]);
+      setNotaMencoes([]);
       showToast("Anotação salva com sucesso");
     } catch (err) {
       console.error(err);
@@ -621,12 +640,18 @@ export default function DealDetailPanel({
                   rows={4}
                   imagens={notaImagens}
                   onImagensChange={setNotaImagens}
+                  mencionaveis={usuarios
+                    .filter((u) => u.id !== user?.id)
+                    .map((u) => ({ id: u.id, nome: u.nome }))}
+                  mencoes={notaMencoes}
+                  onMencoesChange={setNotaMencoes}
                 />
                 <div className="flex items-center justify-end gap-2 mt-2">
                   <button
                     onClick={() => {
                       setNotaValue("");
                       setNotaImagens([]);
+                      setNotaMencoes([]);
                     }}
                     className="rounded-lg px-3.5 py-2 text-sm font-medium text-text-gray hover:bg-panel-bg transition-colors"
                   >

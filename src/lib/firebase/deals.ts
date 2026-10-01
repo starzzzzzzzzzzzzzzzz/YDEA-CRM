@@ -29,13 +29,49 @@ export async function fetchDeal(id: string): Promise<Deal | null> {
 
 export async function createDeal(dados: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
   const createdAt = new Date().toISOString().slice(0, 10);
-  const payload = stripUndefined({ ...dados, createdAt, _createdAt: serverTimestamp() });
+
+  // 1. Tratamento e sanitização profunda para documentos/fotos anexados
+  const dadosSanitizados = { ...dados };
+
+  if (Array.isArray((dadosSanitizados as any).documentos)) {
+    (dadosSanitizados as any).documentos = (dadosSanitizados as any).documentos.map((docAnexo: any) =>
+      stripUndefined({
+        nome: docAnexo.nome ?? "",
+        url: docAnexo.url ?? null,
+        tipo: docAnexo.tipo ?? null,
+        tamanho: docAnexo.tamanho ?? 0,
+        createdAt: docAnexo.createdAt ?? new Date().toISOString(),
+      })
+    );
+  }
+
+  // 2. Limpeza global do payload para o Firestore
+  const payload = stripUndefined({
+    ...dadosSanitizados,
+    createdAt,
+    _createdAt: serverTimestamp(),
+  });
+
   const ref = await addDoc(collection(db, COLLECTION), payload);
   return { id: ref.id, ...dados, createdAt };
 }
 
 export async function updateDealDoc(id: string, patch: Partial<Deal>): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, id), stripUndefined(patch));
+  const patchSanitizado = { ...patch };
+
+  if (Array.isArray((patchSanitizado as any).documentos)) {
+    (patchSanitizado as any).documentos = (patchSanitizado as any).documentos.map((docAnexo: any) =>
+      stripUndefined({
+        nome: docAnexo.nome ?? "",
+        url: docAnexo.url ?? null,
+        tipo: docAnexo.tipo ?? null,
+        tamanho: docAnexo.tamanho ?? 0,
+        createdAt: docAnexo.createdAt ?? new Date().toISOString(),
+      })
+    );
+  }
+
+  await updateDoc(doc(db, COLLECTION, id), stripUndefined(patchSanitizado));
 }
 
 export async function deleteDeal(id: string): Promise<void> {
