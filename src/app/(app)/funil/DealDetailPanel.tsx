@@ -210,7 +210,10 @@ export default function DealDetailPanel({
           autorId: user.id,
           autorNome: user.nome,
           texto: notaValue.trim(),
-        }).catch((err) => console.error("Erro ao notificar os colaboradores marcados:", err));
+        }).catch((err) => {
+          console.error("Erro ao notificar os colaboradores marcados:", err);
+          showToast("Anotação salva, mas a notificação não chegou para quem foi marcado", "error");
+        });
       }
       setNotaValue("");
       setNotaImagens([]);

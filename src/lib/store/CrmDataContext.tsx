@@ -16,6 +16,12 @@ import { MOCK_PESSOAS } from "@/lib/mock-pessoas";
 import { MOCK_LEADS } from "@/lib/mock-leads";
 import { fetchClientes, createCliente } from "@/lib/firebase/clientes";
 import {
+  fetchOrganizacoes,
+  fetchPessoas,
+  saveOrganizacao,
+  savePessoa,
+} from "@/lib/firebase/cadastros";
+import {
   fetchDeals,
   createDeal,
   AnexosFalharam,
@@ -73,6 +79,29 @@ export function CrmDataProvider({
   // Leads ainda são dado fictício em memória — próxima frente a migrar pro Firestore.
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
 
+  // Organizações e pessoas criadas no Funil ficam no Firestore; os dados fictícios
+  // continuam na lista (por último) só pra não quebrar negócios antigos que apontam pra eles.
+  useEffect(() => {
+    let cancelado = false;
+    fetchOrganizacoes()
+      .then((rows) => {
+        if (cancelado) return;
+        const ids = new Set(rows.map((r) => r.id));
+        setOrganizacoes([...rows, ...MOCK_ORGANIZACOES.filter((m) => !ids.has(m.id))]);
+      })
+      .catch((err) => console.error("Erro ao carregar organizações do Firestore:", err));
+    fetchPessoas()
+      .then((rows) => {
+        if (cancelado) return;
+        const ids = new Set(rows.map((r) => r.id));
+        setPessoas([...rows, ...MOCK_PESSOAS.filter((m) => !ids.has(m.id))]);
+      })
+      .catch((err) => console.error("Erro ao carregar pessoas do Firestore:", err));
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelado = false;
     fetchClientes()
@@ -105,6 +134,9 @@ export function CrmDataProvider({
 
   function addOrganizacao(org: Organizacao) {
     setOrganizacoes((prev) => [org, ...prev]);
+    saveOrganizacao(org).catch((err) =>
+      console.error("Erro ao salvar organização no Firestore:", err)
+    );
     const dados: Omit<Cliente, "id" | "codigo" | "createdAt"> = {
       tipoPessoa: org.tipo,
       nome: org.nome,
@@ -138,6 +170,7 @@ export function CrmDataProvider({
 
   function addPessoa(pessoa: Pessoa) {
     setPessoas((prev) => [pessoa, ...prev]);
+    savePessoa(pessoa).catch((err) => console.error("Erro ao salvar pessoa no Firestore:", err));
     const vinculada = pessoa.organizacaoId
       ? organizacoes.find((o) => o.id === pessoa.organizacaoId)
       : undefined;
