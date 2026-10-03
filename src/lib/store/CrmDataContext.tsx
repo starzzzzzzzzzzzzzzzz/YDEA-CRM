@@ -11,6 +11,7 @@ import {
   Temperatura,
   Usuario,
 } from "@/lib/types";
+import { PROXIMO_APOS_GANHO } from "@/lib/funnels";
 import { MOCK_ORGANIZACOES } from "@/lib/mock-organizacoes";
 import { MOCK_PESSOAS } from "@/lib/mock-pessoas";
 import { MOCK_LEADS } from "@/lib/mock-leads";
@@ -48,6 +49,8 @@ type CrmDataContextValue = {
   updateDeal: (id: string, patch: Partial<Deal>) => void;
   removeDeal: (id: string) => Promise<void>;
   duplicateDeal: (deal: Deal) => Promise<Deal>;
+  /** Cria o card do próximo funil da cadeia (só se o funil tiver um próximo e ainda não foi criado). */
+  criarNegocioSeguinte: (deal: Deal) => Promise<Deal | null>;
   addLead: (lead: Omit<Lead, "id" | "stage">) => Lead;
   updateLead: (id: string, patch: Partial<Lead>) => void;
   getOrganizacao: (id?: string) => Organizacao | undefined;
@@ -217,12 +220,56 @@ export function CrmDataProvider({
   }
 
   function updateDeal(id: string, patch: Partial<Deal>) {
+    // Mudou de etapa? Registra no histórico (base para tempo por etapa e conversão).
+    const atual = deals.find((d) => d.id === id);
+    let patchFinal = patch;
+    if (patch.stageId && atual && patch.stageId !== atual.stageId) {
+      patchFinal = {
+        ...patch,
+        historicoEtapas: [
+          ...(atual.historicoEtapas ?? []),
+          { stageId: patch.stageId, em: new Date().toISOString() },
+        ],
+      };
+    }
     // Otimista: reflete na hora na tela (essencial pro drag-and-drop do Kanban não travar),
     // e grava no Firestore em paralelo.
-    setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
-    updateDealDoc(id, patch).catch((err) =>
+    setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patchFinal } : d)));
+    updateDealDoc(id, patchFinal).catch((err) =>
       console.error("Erro ao salvar alteração do negócio no Firestore:", err)
     );
+  }
+
+  async function criarNegocioSeguinte(deal: Deal): Promise<Deal | null> {
+    const proximo = PROXIMO_APOS_GANHO[deal.funnelId];
+    if (!proximo || deal.negocioSeguinteId) return null;
+
+    // Copia os dados do negócio (cliente, organização/pessoa, responsável, valor, UC, projeto...),
+    // sem o que é do ciclo anterior (status, anexos, histórico, vínculos).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {
+      id,
+      createdAt,
+      status,
+      motivoPerda,
+      fechadoEm,
+      documentos,
+      negocioOrigemId,
+      negocioSeguinteId,
+      historicoEtapas,
+      previsaoFechamento,
+      ...dados
+    } = deal;
+
+    const novo = await addDeal({
+      ...dados,
+      funnelId: proximo.funnelId,
+      stageId: proximo.stageId,
+      status: "aberto",
+      negocioOrigemId: deal.id,
+    });
+    updateDeal(deal.id, { negocioSeguinteId: novo.id });
+    return novo;
   }
 
   async function removeDeal(id: string): Promise<void> {
@@ -270,6 +317,7 @@ export function CrmDataProvider({
       updateDeal,
       removeDeal,
       duplicateDeal,
+      criarNegocioSeguinte,
       addLead,
       updateLead,
       getOrganizacao,

@@ -112,7 +112,8 @@ export default function DealDetailPanel({
    * pro card atualizar o ícone na hora, sem esperar um refetch. */
   onAtividadesStatusChange?: (dealId: string, pendente: boolean) => void;
 }) {
-  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal } = useCrmData();
+  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal, criarNegocioSeguinte } =
+    useCrmData();
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -167,6 +168,7 @@ export default function DealDetailPanel({
       setMotivoPerdaAberto(true);
       return;
     }
+    const jaEstavaGanho = deal!.status === "ganho";
     updateDeal(deal!.id, {
       status,
       fechadoEm: new Date().toISOString(),
@@ -174,6 +176,26 @@ export default function DealDetailPanel({
     });
     setMotivoPerdaAberto(false);
     setMotivoPerda("");
+
+    if (status === "ganho" && !jaEstavaGanho) {
+      try {
+        const seguinte = await criarNegocioSeguinte({ ...deal!, status: "ganho" });
+        if (seguinte) {
+          const funilDestino = FUNNELS.find((f) => f.id === seguinte.funnelId);
+          const etapaDestino = funilDestino?.stages.find((e) => e.id === seguinte.stageId);
+          showToast(
+            `Ganho 🎉 Card criado em ${funilDestino?.name ?? "próximo funil"} (${etapaDestino?.label ?? "primeira etapa"})`,
+            "success"
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("Erro ao criar o card seguinte:", err);
+        showToast("Marcado como ganho, mas não consegui criar o card do próximo funil", "error");
+        return;
+      }
+    }
+
     showToast(
       status === "ganho" ? "Negócio marcado como ganho 🎉" : "Negócio marcado como perdido",
       status === "ganho" ? "success" : "info"

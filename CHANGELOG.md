@@ -4,6 +4,22 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v16 — Cadeia automática de funis e histórico de etapas
+
+**Ao marcar um negócio como Ganho, o sistema cria sozinho o card do próximo funil:**
+- Comercial (Ganho) → novo negócio em **Engenharia**, etapa "Onboard".
+- Engenharia (Ganho) → novo negócio em **Pós-Acompanhamento**, etapa "On board".
+- Pós-Acompanhamento (Ganho) → novo negócio em **Pós-NPS**, etapa "NPS Comercial".
+- Pós-NPS é o fim da cadeia: marcar Ganho ali não cria nada.
+
+O novo card copia cliente, organização/pessoa, responsável, valor, unidade consumidora e dados do projeto. Não copia status, anexos, previsão de fechamento nem histórico. Os dois cards ficam ligados (`negocioOrigemId` / `negocioSeguinteId`), e o card seguinte só é criado uma vez, mesmo que o Ganho seja marcado de novo. Se a criação falhar, o negócio continua como Ganho e aparece um aviso na tela. A cadeia fica em `PROXIMO_APOS_GANHO` (`src/lib/funnels.ts`); para estender (Gestão Energética, Ampliação), basta incluir uma linha.
+
+**Histórico de etapas:** cada negócio passa a gravar `historicoEtapas` (etapa + data/hora) na criação e a cada mudança de etapa. Negócios anteriores a esta versão começam o histórico na próxima movimentação. É a base para os relatórios de tempo por etapa e conversão.
+
+**Limitação:** negócios criados já com status Ganho no formulário de criação não disparam a cadeia (só a ação "Ganho" do painel do negócio).
+
+---
+
 ## v15 — Upload de documentos e fotos do negócio, consertado de vez
 
 **O bug:** anexar um documento/foto num negócio "subia" sem erro, mas nunca aparecia depois. Causa raiz: o Firebase Storage, no plano gratuito (Spark), hoje exige vincular uma conta de faturamento mesmo pra guardar arquivos pequenos — então o upload ficava travado num limbo sem avisar.

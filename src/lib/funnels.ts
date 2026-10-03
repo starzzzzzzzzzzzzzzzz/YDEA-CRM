@@ -1,4 +1,4 @@
-import { Funnel } from "./types";
+import { Funnel, FunnelId } from "./types";
 
 export const FUNNELS: Funnel[] = [
   {
@@ -70,3 +70,14 @@ export const FUNNELS: Funnel[] = [
     ],
   },
 ];
+
+/**
+ * Cadeia automática: ao marcar um negócio como Ganho, o sistema cria o próximo card.
+ * Pós-NPS é o fim da cadeia (não dispara nada). Para estender (ex.: Gestão Energética
+ * ou Ampliação), basta adicionar uma linha aqui.
+ */
+export const PROXIMO_APOS_GANHO: Partial<Record<FunnelId, { funnelId: FunnelId; stageId: string }>> = {
+  comercial: { funnelId: "engenharia", stageId: "onboard" },
+  engenharia: { funnelId: "pos_acompanhamento", stageId: "on_board" },
+  pos_acompanhamento: { funnelId: "pos_nps", stageId: "nps_comercial" },
+};

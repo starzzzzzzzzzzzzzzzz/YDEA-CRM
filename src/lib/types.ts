@@ -206,6 +206,13 @@ export type Deal = {
   motivoPerda?: string;
   fechadoEm?: string;
 
+  // Encadeamento entre funis (Comercial → Engenharia → Pós-Acompanhamento → Pós-NPS)
+  negocioOrigemId?: string;
+  negocioSeguinteId?: string;
+
+  // Histórico de mudanças de etapa (base para tempo por etapa e conversão nos relatórios)
+  historicoEtapas?: { stageId: string; em: string }[];
+
   documentos?: DocumentoAnexo[];
   observacoes?: string;
 };
