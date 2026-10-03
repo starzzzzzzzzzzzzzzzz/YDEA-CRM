@@ -11,7 +11,8 @@ import {
   Temperatura,
   Usuario,
 } from "@/lib/types";
-import { FUNNELS, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
+import { FUNNELS, FUNCAO_DO_FUNIL, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
+import { enviarEmailNovoCard } from "@/lib/notificarEmail";
 import { fetchDocumentos, copiarDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios } from "@/lib/firebase/firestore";
 import { criarNotificacoesNovoNegocio } from "@/lib/firebase/notificacoes";
@@ -223,7 +224,8 @@ export function CrmDataProvider({
       .catch((err) => console.error("Erro ao salvar cliente (pessoa) no Firestore:", err));
   }
 
-  async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
+  // Grava o card e coloca na lista (sem avisar ninguém).
+  async function criarDealNaLista(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
     try {
       const criado = await createDeal(deal);
       setDeals((prev) => [criado, ...prev]);
@@ -233,6 +235,48 @@ export function CrmDataProvider({
       if (err instanceof AnexosFalharam) setDeals((prev) => [err.deal, ...prev]);
       throw err;
     }
+  }
+
+  /**
+   * Avisa quem tem a função do funil do card (sino + e-mail). Devolve quantas pessoas foram
+   * avisadas no sino. O e-mail segue em segundo plano e nunca bloqueia nem falha o fluxo.
+   */
+  async function avisarFuncaoDoFunil(novo: Deal, excluirAutor: boolean): Promise<number> {
+    const funcao = FUNCAO_DO_FUNIL[novo.funnelId];
+    if (!funcao) return 0;
+    const usuarios = await fetchAllUsuarios();
+    const alvo = usuarios
+      .filter((u) => u.funcao === funcao && !(excluirAutor && u.id === currentUser.id))
+      .map((u) => u.id);
+    if (alvo.length === 0) return 0;
+
+    const funil = FUNNELS.find((f) => f.id === novo.funnelId);
+    const etapa = funil?.stages.find((e) => e.id === novo.stageId);
+    await criarNotificacoesNovoNegocio({
+      destinatarios: alvo,
+      dealId: novo.id,
+      dealTitulo: novo.titulo,
+      autorId: currentUser.id,
+      autorNome: currentUser.nome,
+      destino: `${funil?.name ?? ""} · ${etapa?.label ?? ""}`,
+    });
+    void enviarEmailNovoCard(novo.id, excluirAutor);
+    return alvo.length;
+  }
+
+  // Criação manual de card (botão "Criar negócio"): avisa a função do funil, menos quem criou.
+  async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
+    let criado: Deal;
+    try {
+      criado = await criarDealNaLista(deal);
+    } catch (err) {
+      if (err instanceof AnexosFalharam) {
+        avisarFuncaoDoFunil(err.deal, true).catch((e) => console.error("Erro ao avisar a equipe:", e));
+      }
+      throw err;
+    }
+    avisarFuncaoDoFunil(criado, true).catch((e) => console.error("Erro ao avisar a equipe:", e));
+    return criado;
   }
 
   function updateDeal(id: string, patch: Partial<Deal>) {
@@ -278,7 +322,7 @@ export function CrmDataProvider({
 
     // Copia os dados do negócio (cliente, organização/pessoa, responsável, valor, UC, projeto...),
     // sem o que é do ciclo anterior (status, anexos, histórico, vínculo).
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    /* eslint-disable @typescript-eslint/no-unused-vars */
     const {
       id,
       createdAt,
@@ -291,6 +335,7 @@ export function CrmDataProvider({
       previsaoFechamento,
       ...dados
     } = deal;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
 
     for (const destino of destinos) {
       // Já existe card desse funil criado a partir deste negócio? Não duplica.
@@ -300,7 +345,7 @@ export function CrmDataProvider({
 
       let novo: Deal;
       try {
-        novo = await addDeal({
+        novo = await criarDealNaLista({
           ...dados,
           titulo: tituloComPrefixo(dados.titulo, destino.prefixoTitulo),
           funnelId: destino.funnelId,
@@ -328,25 +373,12 @@ export function CrmDataProvider({
         resultado.documentosComErro += r.falhas.length;
       }
 
-      if (destino.notificarFuncao) {
-        try {
-          const usuarios = await fetchAllUsuarios();
-          const alvo = usuarios.filter((u) => u.funcao === destino.notificarFuncao).map((u) => u.id);
-          if (alvo.length > 0) {
-            await criarNotificacoesNovoNegocio({
-              destinatarios: alvo,
-              dealId: novo.id,
-              dealTitulo: novo.titulo,
-              autorId: currentUser.id,
-              autorNome: currentUser.nome,
-              destino: `${funil?.name ?? ""} · ${etapa?.label ?? ""}`,
-            });
-          }
-          resultado.pessoasAvisadas += alvo.length;
-        } catch (err) {
-          console.error("Erro ao avisar a equipe do novo card:", err);
-          resultado.avisoFalhou = true;
-        }
+      // Cadeia: avisa a função do funil de destino (inclusive quem marcou Ganho, se tiver a função).
+      try {
+        resultado.pessoasAvisadas += await avisarFuncaoDoFunil(novo, false);
+      } catch (err) {
+        console.error("Erro ao avisar a equipe do novo card:", err);
+        resultado.avisoFalhou = true;
       }
     }
     return resultado;

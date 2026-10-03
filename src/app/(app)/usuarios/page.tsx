@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Shield, UserPlus, X } from "lucide-react";
 import { CARGOS } from "@/lib/db/cargos";
 import { FUNCOES } from "@/lib/db/funcoes";
+import { FUNNELS, FUNCAO_DO_FUNIL } from "@/lib/funnels";
 import { permissoesDoCargo, PERMISSOES } from "@/lib/db/permissoes";
 import {
   fetchAllUsuarios,
@@ -198,6 +199,22 @@ export default function UsuariosPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card-bg p-4">
+        <h2 className="font-display font-semibold text-[13.5px] text-text-dark mb-1">
+          Quem é avisado em cada funil
+        </h2>
+        <p className="text-[12px] text-text-gray mb-3">
+          Quando um card é criado, quem tem a função do funil recebe aviso no sino e por e-mail.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {FUNNELS.filter((fl) => FUNCAO_DO_FUNIL[fl.id]).map((fl) => (
+            <span key={fl.id} className="text-[11.5px] font-medium px-2 py-1.5 rounded-md bg-panel-bg text-text-gray">
+              {fl.name} → {FUNCOES.find((fn) => fn.id === FUNCAO_DO_FUNIL[fl.id])?.nome}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div>

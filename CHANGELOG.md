@@ -4,6 +4,21 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v18 — Aviso (sino + e-mail) para a função de cada funil
+
+Cada funil passa a ter uma função responsável, conforme o que a pessoa é na equipe (campo "Função", na tela Equipe):
+- Funil **Comercial** → função **Comercial / Vendedor**
+- Funil **Engenharia** → função **Engenharia / Projetista**
+- Funis **Pós-Acompanhamento** e **Pós-NPS** → função **Pós-venda**
+
+**Sempre que um card é criado num desses funis**, quem tem a função correspondente recebe a notificação no sino **e um e-mail** com o nome do card, o funil/etapa e um botão "Abrir no CRM". Vale tanto para cards criados pela cadeia (Ganho) quanto para os criados à mão (nesse caso, quem criou não é avisado do próprio card). O mapa funil → função fica em `FUNCAO_DO_FUNIL` (`src/lib/funnels.ts`); funis que não estão lá (Gestão Energética, Ampliação) não avisam ninguém por enquanto.
+
+**E-mail — configuração necessária (uma vez):** o envio usa o serviço Resend (`src/app/api/notificar-email/route.ts`). Crie uma conta em resend.com, verifique o domínio de e-mail da YDEA e defina as variáveis `RESEND_API_KEY` e `EMAIL_FROM` (no `.env.local` e, em produção, nas variáveis de ambiente da Vercel; modelo no `.env.local.example`). **Sem essas variáveis o CRM funciona normalmente** — só não envia e-mail, e o aviso do sino continua. Os destinatários e o texto do e-mail saem do próprio Firestore (função do funil e dados do card), não do navegador.
+
+**Observações:** quem não tem função cadastrada não recebe avisos. Os dois cards do pós (Pós-Acompanhamento e Pós-NPS) geram dois avisos para o pós-venda, um por card.
+
+---
+
 ## v17 — Nome automático nos cards criados pela cadeia
 
 Os cards criados automaticamente já nascem com o nome do funil na frente, para dar pra bater o olho e saber onde cada um está:

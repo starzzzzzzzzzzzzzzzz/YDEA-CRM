@@ -76,13 +76,11 @@ export type DestinoCadeia = {
   stageId: string;
   /** Prefixo do nome do card criado, ex.: "ENGENHARIA" → "[ENGENHARIA] Nome do cliente". */
   prefixoTitulo: string;
-  /** Se informado, quem tem essa função na equipe é avisado no sino quando o card é criado. */
-  notificarFuncao?: FuncaoId;
 };
 
 /**
  * Cadeia automática: ao marcar um negócio como Ganho, o sistema cria os cards seguintes.
- * - Comercial → Engenharia (Onboard), avisando quem é da Engenharia.
+ * - Comercial → Engenharia (Onboard).
  * - Engenharia → Pós-Acompanhamento (On board) E Pós-NPS (NPS Comercial), ao mesmo tempo.
  * - Pós-Acompanhamento e Pós-NPS são o fim da cadeia (não disparam nada).
  * Para estender (Gestão Energética, Ampliação) ou avisar outra função, basta editar aqui.
@@ -92,12 +90,22 @@ export const PROXIMOS_APOS_GANHO: Partial<Record<FunnelId, DestinoCadeia[]>> = {
       funnelId: "engenharia",
       stageId: "onboard",
       prefixoTitulo: "ENGENHARIA",
-      notificarFuncao: "engenharia",
     },],
   engenharia: [
     { funnelId: "pos_acompanhamento", stageId: "on_board", prefixoTitulo: "PÓS" },
     { funnelId: "pos_nps", stageId: "nps_comercial", prefixoTitulo: "PÓS NPS" },
   ],
+};
+
+/**
+ * Quem é avisado (sino + e-mail) quando um card é criado em cada funil, conforme a função
+ * cadastrada na tela Equipe. Funil que não aparece aqui não avisa ninguém.
+ */
+export const FUNCAO_DO_FUNIL: Partial<Record<FunnelId, FuncaoId>> = {
+  comercial: "comercial",
+  engenharia: "engenharia",
+  pos_acompanhamento: "pos_venda",
+  pos_nps: "pos_venda",
 };
 
 /**
