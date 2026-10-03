@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shield, UserPlus, X } from "lucide-react";
+import { Shield, Trash2, UserPlus, X } from "lucide-react";
 import { CARGOS } from "@/lib/db/cargos";
 import { FUNCOES } from "@/lib/db/funcoes";
 import { FUNNELS, FUNCAO_DO_FUNIL } from "@/lib/funnels";
@@ -15,6 +15,7 @@ import {
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { auth } from "@/lib/firebase/config";
 import { CargoId, FuncaoId } from "@/lib/types";
+import Modal from "@/components/ui/Modal";
 
 type UsuarioRow = UsuarioDoc & { id: string };
 
@@ -26,6 +27,7 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [excluindo, setExcluindo] = useState<UsuarioRow | null>(null);
 
   function reload() {
     fetchAllUsuarios()
@@ -110,6 +112,17 @@ export default function UsuariosPage() {
         />
       )}
 
+      {excluindo && isAdmin && (
+        <ConfirmarExclusao
+          usuario={excluindo}
+          onClose={() => setExcluindo(null)}
+          onDeleted={() => {
+            setUsuarios((prev) => (prev ? prev.filter((u) => u.id !== excluindo.id) : prev));
+            setExcluindo(null);
+          }}
+        />
+      )}
+
       <div className="rounded-2xl border border-border bg-card-bg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -119,19 +132,20 @@ export default function UsuariosPage() {
               <th className="px-4 py-3 font-medium">Cargo</th>
               <th className="px-4 py-3 font-medium">Função</th>
               <th className="px-4 py-3 font-medium">Permissões</th>
+              <th className="px-4 py-3 font-medium w-12" />
             </tr>
           </thead>
           <tbody>
             {usuarios === null && !error && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-[13px] text-text-faint">
+                <td colSpan={6} className="px-4 py-6 text-center text-[13px] text-text-faint">
                   Carregando usuários do Firestore...
                 </td>
               </tr>
             )}
             {usuarios?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-[13px] text-text-faint">
+                <td colSpan={6} className="px-4 py-6 text-center text-[13px] text-text-faint">
                   Nenhum usuário cadastrado ainda. Clique em &quot;Adicionar usuário&quot; pra criar o
                   primeiro.
                 </td>
@@ -194,6 +208,19 @@ export default function UsuariosPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-[11.5px] text-text-faint">{permissoes.length} permissões</td>
+                  <td className="px-4 py-3 text-right">
+                    {isAdmin && u.id !== currentUser.id && (
+                      <button
+                        type="button"
+                        onClick={() => setExcluindo(u)}
+                        title="Excluir usuário"
+                        aria-label={`Excluir ${u.nome}`}
+                        className="h-7 w-7 rounded-md inline-flex items-center justify-center text-text-faint hover:text-red-600 hover:bg-panel-bg transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -373,5 +400,75 @@ function AddUsuarioForm({ onClose, onCreated }: { onClose: () => void; onCreated
       </form>
       {formError && <p className="text-[12px] text-red-600 mt-3">{formError}</p>}
     </div>
+  );
+}
+
+function ConfirmarExclusao({
+  usuario,
+  onClose,
+  onDeleted,
+}: {
+  usuario: UsuarioRow;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [excluindo, setExcluindo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function confirmar() {
+    setExcluindo(true);
+    setErro(null);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Sessão não encontrada.");
+
+      const res = await fetch(`/api/admin/usuarios/${encodeURIComponent(usuario.id)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Não foi possível excluir o usuário.");
+
+      onDeleted();
+    } catch (err) {
+      console.error(err);
+      setErro(err instanceof Error ? err.message : "Não foi possível excluir o usuário.");
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} widthClass="max-w-md">
+      {(fechar) => (
+        <div className="p-5">
+          <h3 className="font-display font-semibold text-[15px] text-text-dark mb-2">
+            Excluir {usuario.nome}?
+          </h3>
+          <p className="text-[13px] text-text-gray">
+            A conta de login ({usuario.email}) é apagada e a pessoa perde o acesso ao CRM na hora. Isso não
+            pode ser desfeito. As anotações e atividades que ela escreveu continuam, com o nome dela.
+          </p>
+          {erro && <p className="text-[12px] text-red-600 mt-3">{erro}</p>}
+          <div className="flex justify-end gap-2 mt-5">
+            <button
+              type="button"
+              onClick={fechar}
+              disabled={excluindo}
+              className="rounded-lg border border-border px-4 py-2 text-[12.5px] font-medium text-text-gray hover:bg-panel-bg transition-colors disabled:opacity-60"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmar}
+              disabled={excluindo}
+              className="rounded-lg bg-red-600 text-white font-semibold text-[12.5px] px-4 py-2 hover:bg-red-700 transition-colors disabled:opacity-60"
+            >
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

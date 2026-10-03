@@ -1,0 +1,375 @@
+--- a/.env.local.example	2026-10-01 19:04:07.000000000 +0000
++++ b/.env.local.example	2026-10-03 17:27:15.681396484 +0000
+@@ -8,3 +8,9 @@
+ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+ NEXT_PUBLIC_FIREBASE_APP_ID=
++
++# E-mail de aviso de novo card (opcional) — serviço Resend (https://resend.com).
++# Sem RESEND_API_KEY o CRM funciona normalmente, só não manda e-mail (o aviso no sino continua).
++RESEND_API_KEY=
++# Remetente. Precisa ser de um domínio verificado no Resend. Ex.: CRM YDEA <crm@seudominio.com.br>
++EMAIL_FROM=
+--- a/CHANGELOG.md	2026-10-03 17:20:05.000000000 +0000
++++ b/CHANGELOG.md	2026-10-03 17:27:15.736152473 +0000
+@@ -4,6 +4,21 @@
+ 
+ ---
+ 
++## v18 — Aviso (sino + e-mail) para a função de cada funil
++
++Cada funil passa a ter uma função responsável, conforme o que a pessoa é na equipe (campo "Função", na tela Equipe):
++- Funil **Comercial** → função **Comercial / Vendedor**
++- Funil **Engenharia** → função **Engenharia / Projetista**
++- Funis **Pós-Acompanhamento** e **Pós-NPS** → função **Pós-venda**
++
++**Sempre que um card é criado num desses funis**, quem tem a função correspondente recebe a notificação no sino **e um e-mail** com o nome do card, o funil/etapa e um botão "Abrir no CRM". Vale tanto para cards criados pela cadeia (Ganho) quanto para os criados à mão (nesse caso, quem criou não é avisado do próprio card). O mapa funil → função fica em `FUNCAO_DO_FUNIL` (`src/lib/funnels.ts`); funis que não estão lá (Gestão Energética, Ampliação) não avisam ninguém por enquanto.
++
++**E-mail — configuração necessária (uma vez):** o envio usa o serviço Resend (`src/app/api/notificar-email/route.ts`). Crie uma conta em resend.com, verifique o domínio de e-mail da YDEA e defina as variáveis `RESEND_API_KEY` e `EMAIL_FROM` (no `.env.local` e, em produção, nas variáveis de ambiente da Vercel; modelo no `.env.local.example`). **Sem essas variáveis o CRM funciona normalmente** — só não envia e-mail, e o aviso do sino continua. Os destinatários e o texto do e-mail saem do próprio Firestore (função do funil e dados do card), não do navegador.
++
++**Observações:** quem não tem função cadastrada não recebe avisos. Os dois cards do pós (Pós-Acompanhamento e Pós-NPS) geram dois avisos para o pós-venda, um por card.
++
++---
++
+ ## v17 — Nome automático nos cards criados pela cadeia
+ 
+ Os cards criados automaticamente já nascem com o nome do funil na frente, para dar pra bater o olho e saber onde cada um está:
+--- a/src/app/(app)/usuarios/page.tsx	2026-10-03 17:11:03.000000000 +0000
++++ b/src/app/(app)/usuarios/page.tsx	2026-10-03 17:27:15.735714710 +0000
+@@ -4,6 +4,7 @@
+ import { Shield, UserPlus, X } from "lucide-react";
+ import { CARGOS } from "@/lib/db/cargos";
+ import { FUNCOES } from "@/lib/db/funcoes";
++import { FUNNELS, FUNCAO_DO_FUNIL } from "@/lib/funnels";
+ import { permissoesDoCargo, PERMISSOES } from "@/lib/db/permissoes";
+ import {
+   fetchAllUsuarios,
+@@ -200,6 +201,22 @@
+         </table>
+       </div>
+ 
++      <div className="rounded-xl border border-border bg-card-bg p-4">
++        <h2 className="font-display font-semibold text-[13.5px] text-text-dark mb-1">
++          Quem é avisado em cada funil
++        </h2>
++        <p className="text-[12px] text-text-gray mb-3">
++          Quando um card é criado, quem tem a função do funil recebe aviso no sino e por e-mail.
++        </p>
++        <div className="flex flex-wrap gap-2">
++          {FUNNELS.filter((fl) => FUNCAO_DO_FUNIL[fl.id]).map((fl) => (
++            <span key={fl.id} className="text-[11.5px] font-medium px-2 py-1.5 rounded-md bg-panel-bg text-text-gray">
++              {fl.name} → {FUNCOES.find((fn) => fn.id === FUNCAO_DO_FUNIL[fl.id])?.nome}
++            </span>
++          ))}
++        </div>
++      </div>
++
+       <div>
+         <h2 className="font-display font-semibold text-[14.5px] text-text-dark mb-3">Cargos e permissões</h2>
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+--- a/src/app/api/notificar-email/route.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/src/app/api/notificar-email/route.ts	2026-10-03 17:27:15.681396484 +0000
+@@ -0,0 +1,87 @@
++import { NextRequest, NextResponse } from "next/server";
++import { adminAuth, adminDb } from "@/lib/firebase/admin";
++import { FUNNELS, FUNCAO_DO_FUNIL } from "@/lib/funnels";
++
++function esc(texto: string): string {
++  return texto
++    .replace(/&/g, "&amp;")
++    .replace(/</g, "&lt;")
++    .replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;");
++}
++
++/**
++ * Manda e-mail de "novo card" para quem tem a função do funil (ex.: funil Engenharia →
++ * quem tem a função Engenharia). Serviço de e-mail: Resend (https://resend.com), via API REST.
++ * Variáveis de ambiente: RESEND_API_KEY (obrigatória) e EMAIL_FROM (ex.: "CRM YDEA <crm@seudominio.com.br>").
++ * Segurança: os destinatários e o texto saem do Firestore (não do que o navegador envia),
++ * então a rota não serve pra mandar mensagem arbitrária pra qualquer endereço.
++ */
++export async function POST(req: NextRequest) {
++  const idToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
++  if (!idToken) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
++
++  let callerUid: string;
++  try {
++    callerUid = (await adminAuth().verifyIdToken(idToken)).uid;
++  } catch {
++    return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
++  }
++
++  const apiKey = process.env.RESEND_API_KEY;
++  if (!apiKey) {
++    return NextResponse.json({ error: "E-mail não configurado (falta RESEND_API_KEY)." }, { status: 503 });
++  }
++  const from = process.env.EMAIL_FROM || "CRM YDEA <onboarding@resend.dev>";
++
++  const body = await req.json().catch(() => null);
++  const dealId = typeof body?.dealId === "string" ? body.dealId : "";
++  const excluirAutor = body?.excluirAutor === true;
++  if (!dealId) return NextResponse.json({ error: "Informe o dealId." }, { status: 400 });
++
++  const dealSnap = await adminDb().collection("deals").doc(dealId).get();
++  if (!dealSnap.exists) return NextResponse.json({ error: "Negócio não encontrado." }, { status: 404 });
++  const deal = dealSnap.data() as { titulo?: string; funnelId?: string; stageId?: string };
++
++  const funcao = deal.funnelId ? FUNCAO_DO_FUNIL[deal.funnelId as keyof typeof FUNCAO_DO_FUNIL] : undefined;
++  if (!funcao) return NextResponse.json({ enviados: 0, motivo: "Funil sem função responsável." });
++
++  const funil = FUNNELS.find((f) => f.id === deal.funnelId);
++  const etapa = funil?.stages.find((s) => s.id === deal.stageId);
++
++  const usuariosSnap = await adminDb().collection("usuarios").where("funcao", "==", funcao).get();
++  const autor = (await adminDb().collection("usuarios").doc(callerUid).get()).data()?.nome ?? "Alguém da equipe";
++  const destinatarios = usuariosSnap.docs
++    .filter((d) => !(excluirAutor && d.id === callerUid))
++    .map((d) => ({ nome: (d.data().nome as string) ?? "", email: d.data().email as string }))
++    .filter((u) => !!u.email)
++    .slice(0, 20);
++
++  if (destinatarios.length === 0) return NextResponse.json({ enviados: 0, motivo: "Ninguém com essa função." });
++
++  const titulo = deal.titulo ?? "Novo negócio";
++  const destino = `${funil?.name ?? ""}${etapa ? " · " + etapa.label : ""}`;
++  const link = `${req.nextUrl.origin}/funil?negocio=${encodeURIComponent(dealId)}`;
++  const assunto = `Novo card em ${funil?.name ?? "um funil"}: ${titulo}`;
++
++  const resultados = await Promise.allSettled(
++    destinatarios.map(async (u) => {
++      const html = `<div style="font-family:Arial,sans-serif;color:#12263A;max-width:520px">
++<p>Olá${u.nome ? ", " + esc(u.nome.split(" ")[0]) : ""}!</p>
++<p>${esc(autor)} criou um card para a sua área:</p>
++<p style="padding:14px 16px;background:#F3F6F9;border-left:4px solid #E8A100;margin:16px 0"><b>${esc(titulo)}</b><br>${esc(destino)}</p>
++<p><a href="${esc(link)}" style="display:inline-block;background:#E8A100;color:#2B1D00;text-decoration:none;font-weight:bold;padding:10px 18px;border-radius:6px">Abrir no CRM</a></p>
++<p style="color:#5B6B7B;font-size:13px">YDEA Soluções Energéticas · aviso automático do CRM</p></div>`;
++      const r = await fetch("https://api.resend.com/emails", {
++        method: "POST",
++        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
++        body: JSON.stringify({ from, to: [u.email], subject: assunto, html }),
++      });
++      if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
++    })
++  );
++
++  const falhas = resultados.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
++  falhas.forEach((f) => console.error("Falha ao enviar e-mail:", f.reason));
++  return NextResponse.json({ enviados: resultados.length - falhas.length, falhas: falhas.length });
++}
+--- a/src/lib/db/funcoes.ts	2026-10-03 17:10:26.000000000 +0000
++++ b/src/lib/db/funcoes.ts	2026-10-03 17:27:15.734582013 +0000
+@@ -1,10 +1,10 @@
+ import { FuncaoId } from "@/lib/types";
+ 
+ export const FUNCOES: { id: FuncaoId; nome: string; descricao: string }[] = [
+-  { id: "comercial", nome: "Comercial", descricao: "Vendas, propostas e negociação" },
+-  { id: "engenharia", nome: "Engenharia", descricao: "Projetos, ART e homologação" },
++  { id: "comercial", nome: "Comercial / Vendedor", descricao: "Funil Comercial: vendas, propostas e negociação" },
++  { id: "engenharia", nome: "Engenharia / Projetista", descricao: "Funil Engenharia: projetos, ART e homologação" },
+   { id: "instalacao", nome: "Instalação", descricao: "Equipe de campo" },
+-  { id: "pos_venda", nome: "Pós-venda", descricao: "Acompanhamento e NPS" },
++  { id: "pos_venda", nome: "Pós-venda", descricao: "Funis Pós-Acompanhamento e Pós-NPS" },
+   { id: "financeiro", nome: "Financeiro", descricao: "Contas e faturamento" },
+ ];
+ 
+--- a/src/lib/funnels.ts	2026-10-03 17:20:05.000000000 +0000
++++ b/src/lib/funnels.ts	2026-10-03 17:27:15.734917840 +0000
+@@ -76,13 +76,11 @@
+   stageId: string;
+   /** Prefixo do nome do card criado, ex.: "ENGENHARIA" → "[ENGENHARIA] Nome do cliente". */
+   prefixoTitulo: string;
+-  /** Se informado, quem tem essa função na equipe é avisado no sino quando o card é criado. */
+-  notificarFuncao?: FuncaoId;
+ };
+ 
+ /**
+  * Cadeia automática: ao marcar um negócio como Ganho, o sistema cria os cards seguintes.
+- * - Comercial → Engenharia (Onboard), avisando quem é da Engenharia.
++ * - Comercial → Engenharia (Onboard).
+  * - Engenharia → Pós-Acompanhamento (On board) E Pós-NPS (NPS Comercial), ao mesmo tempo.
+  * - Pós-Acompanhamento e Pós-NPS são o fim da cadeia (não disparam nada).
+  * Para estender (Gestão Energética, Ampliação) ou avisar outra função, basta editar aqui.
+@@ -92,7 +90,6 @@
+       funnelId: "engenharia",
+       stageId: "onboard",
+       prefixoTitulo: "ENGENHARIA",
+-      notificarFuncao: "engenharia",
+     },],
+   engenharia: [
+     { funnelId: "pos_acompanhamento", stageId: "on_board", prefixoTitulo: "PÓS" },
+@@ -101,6 +98,17 @@
+ };
+ 
+ /**
++ * Quem é avisado (sino + e-mail) quando um card é criado em cada funil, conforme a função
++ * cadastrada na tela Equipe. Funil que não aparece aqui não avisa ninguém.
++ */
++export const FUNCAO_DO_FUNIL: Partial<Record<FunnelId, FuncaoId>> = {
++  comercial: "comercial",
++  engenharia: "engenharia",
++  pos_acompanhamento: "pos_venda",
++  pos_nps: "pos_venda",
++};
++
++/**
+  * Monta o nome do card da cadeia: troca o prefixo anterior pelo do novo funil.
+  * "[ENGENHARIA] Kauê Silva" + "PÓS" → "[PÓS] Kauê Silva".
+  */
+--- a/src/lib/notificarEmail.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/src/lib/notificarEmail.ts	2026-10-03 17:27:15.681086458 +0000
+@@ -0,0 +1,25 @@
++import { auth } from "@/lib/firebase/config";
++
++/**
++ * Pede ao servidor para mandar e-mail a quem tem a função do funil do card.
++ * O servidor decide os destinatários (função do funil) e monta o texto a partir do
++ * próprio card — o navegador só informa qual card foi criado.
++ * Nunca lança erro: e-mail é complemento, não pode atrapalhar a criação do card.
++ */
++export async function enviarEmailNovoCard(dealId: string, excluirAutor: boolean): Promise<void> {
++  try {
++    const idToken = await auth.currentUser?.getIdToken();
++    if (!idToken) return;
++    const res = await fetch("/api/notificar-email", {
++      method: "POST",
++      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
++      body: JSON.stringify({ dealId, excluirAutor }),
++    });
++    if (!res.ok) {
++      const dados = await res.json().catch(() => null);
++      console.warn("E-mail de novo card não enviado:", dados?.error ?? res.status);
++    }
++  } catch (err) {
++    console.warn("E-mail de novo card não enviado:", err);
++  }
++}
+--- a/src/lib/store/CrmDataContext.tsx	2026-10-03 17:20:05.000000000 +0000
++++ b/src/lib/store/CrmDataContext.tsx	2026-10-03 17:27:55.250592586 +0000
+@@ -11,7 +11,8 @@
+   Temperatura,
+   Usuario,
+ } from "@/lib/types";
+-import { FUNNELS, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
++import { FUNNELS, FUNCAO_DO_FUNIL, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
++import { enviarEmailNovoCard } from "@/lib/notificarEmail";
+ import { fetchDocumentos, copiarDocumentos } from "@/lib/firebase/documentos";
+ import { fetchAllUsuarios } from "@/lib/firebase/firestore";
+ import { criarNotificacoesNovoNegocio } from "@/lib/firebase/notificacoes";
+@@ -223,7 +224,8 @@
+       .catch((err) => console.error("Erro ao salvar cliente (pessoa) no Firestore:", err));
+   }
+ 
+-  async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
++  // Grava o card e coloca na lista (sem avisar ninguém).
++  async function criarDealNaLista(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
+     try {
+       const criado = await createDeal(deal);
+       setDeals((prev) => [criado, ...prev]);
+@@ -235,6 +237,48 @@
+     }
+   }
+ 
++  /**
++   * Avisa quem tem a função do funil do card (sino + e-mail). Devolve quantas pessoas foram
++   * avisadas no sino. O e-mail segue em segundo plano e nunca bloqueia nem falha o fluxo.
++   */
++  async function avisarFuncaoDoFunil(novo: Deal, excluirAutor: boolean): Promise<number> {
++    const funcao = FUNCAO_DO_FUNIL[novo.funnelId];
++    if (!funcao) return 0;
++    const usuarios = await fetchAllUsuarios();
++    const alvo = usuarios
++      .filter((u) => u.funcao === funcao && !(excluirAutor && u.id === currentUser.id))
++      .map((u) => u.id);
++    if (alvo.length === 0) return 0;
++
++    const funil = FUNNELS.find((f) => f.id === novo.funnelId);
++    const etapa = funil?.stages.find((e) => e.id === novo.stageId);
++    await criarNotificacoesNovoNegocio({
++      destinatarios: alvo,
++      dealId: novo.id,
++      dealTitulo: novo.titulo,
++      autorId: currentUser.id,
++      autorNome: currentUser.nome,
++      destino: `${funil?.name ?? ""} · ${etapa?.label ?? ""}`,
++    });
++    void enviarEmailNovoCard(novo.id, excluirAutor);
++    return alvo.length;
++  }
++
++  // Criação manual de card (botão "Criar negócio"): avisa a função do funil, menos quem criou.
++  async function addDeal(deal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
++    let criado: Deal;
++    try {
++      criado = await criarDealNaLista(deal);
++    } catch (err) {
++      if (err instanceof AnexosFalharam) {
++        avisarFuncaoDoFunil(err.deal, true).catch((e) => console.error("Erro ao avisar a equipe:", e));
++      }
++      throw err;
++    }
++    avisarFuncaoDoFunil(criado, true).catch((e) => console.error("Erro ao avisar a equipe:", e));
++    return criado;
++  }
++
+   function updateDeal(id: string, patch: Partial<Deal>) {
+     // Mudou de etapa? Registra no histórico (base para tempo por etapa e conversão).
+     const atual = deals.find((d) => d.id === id);
+@@ -278,7 +322,7 @@
+ 
+     // Copia os dados do negócio (cliente, organização/pessoa, responsável, valor, UC, projeto...),
+     // sem o que é do ciclo anterior (status, anexos, histórico, vínculo).
+-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
++    /* eslint-disable @typescript-eslint/no-unused-vars */
+     const {
+       id,
+       createdAt,
+@@ -291,6 +335,7 @@
+       previsaoFechamento,
+       ...dados
+     } = deal;
++    /* eslint-enable @typescript-eslint/no-unused-vars */
+ 
+     for (const destino of destinos) {
+       // Já existe card desse funil criado a partir deste negócio? Não duplica.
+@@ -300,7 +345,7 @@
+ 
+       let novo: Deal;
+       try {
+-        novo = await addDeal({
++        novo = await criarDealNaLista({
+           ...dados,
+           titulo: tituloComPrefixo(dados.titulo, destino.prefixoTitulo),
+           funnelId: destino.funnelId,
+@@ -328,25 +373,12 @@
+         resultado.documentosComErro += r.falhas.length;
+       }
+ 
+-      if (destino.notificarFuncao) {
+-        try {
+-          const usuarios = await fetchAllUsuarios();
+-          const alvo = usuarios.filter((u) => u.funcao === destino.notificarFuncao).map((u) => u.id);
+-          if (alvo.length > 0) {
+-            await criarNotificacoesNovoNegocio({
+-              destinatarios: alvo,
+-              dealId: novo.id,
+-              dealTitulo: novo.titulo,
+-              autorId: currentUser.id,
+-              autorNome: currentUser.nome,
+-              destino: `${funil?.name ?? ""} · ${etapa?.label ?? ""}`,
+-            });
+-          }
+-          resultado.pessoasAvisadas += alvo.length;
+-        } catch (err) {
+-          console.error("Erro ao avisar a equipe do novo card:", err);
+-          resultado.avisoFalhou = true;
+-        }
++      // Cadeia: avisa a função do funil de destino (inclusive quem marcou Ganho, se tiver a função).
++      try {
++        resultado.pessoasAvisadas += await avisarFuncaoDoFunil(novo, false);
++      } catch (err) {
++        console.error("Erro ao avisar a equipe do novo card:", err);
++        resultado.avisoFalhou = true;
+       }
+     }
+     return resultado;
