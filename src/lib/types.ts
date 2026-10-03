@@ -26,6 +26,13 @@ export type CargoId =
   | "instalacao"
   | "pos_venda";
 
+/**
+ * Função na equipe — separada do cargo (permissões). Dá pra todo mundo ser admin e,
+ * mesmo assim, cada pessoa ter a sua função: é ela que define quem recebe os avisos
+ * de cada etapa (ex.: quem é de Engenharia é avisado quando chega um projeto novo).
+ */
+export type FuncaoId = "comercial" | "engenharia" | "instalacao" | "pos_venda" | "financeiro";
+
 export type Cargo = {
   id: CargoId;
   nome: string;
@@ -48,6 +55,8 @@ export type Usuario = {
   email: string;
   iniciais: string;
   cargoId: CargoId;
+  /** Função na equipe (opcional) — ver FuncaoId. */
+  funcao?: FuncaoId;
   /** Campos opcionais de perfil — nem todo usuário antigo tem isso preenchido ainda. */
   sobrenome?: string;
   telefone?: string;
@@ -205,6 +214,12 @@ export type Deal = {
   // Ganho/Perdido
   motivoPerda?: string;
   fechadoEm?: string;
+
+  // Cadeia entre funis: card criado automaticamente a partir de outro (Ganho)
+  negocioOrigemId?: string;
+
+  // Histórico de mudanças de etapa (base para tempo por etapa e conversão nos relatórios)
+  historicoEtapas?: { stageId: string; em: string }[];
 
   documentos?: DocumentoAnexo[];
   observacoes?: string;

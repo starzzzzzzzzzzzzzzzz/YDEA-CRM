@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, AtSign } from "lucide-react";
+import { Bell, AtSign, Inbox } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import {
   Notificacao,
@@ -95,12 +95,21 @@ export default function NotificacoesBell() {
                     }`}
                   >
                     <div className="h-7 w-7 rounded-full bg-brand-soft text-brand-strong flex items-center justify-center shrink-0 mt-0.5">
-                      <AtSign size={13} />
+                      {n.tipo === "novo_negocio" ? <Inbox size={13} /> : <AtSign size={13} />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[12.5px] text-text-dark">
-                        <span className="font-semibold">{n.deNome}</span> marcou você em{" "}
-                        <span className="font-semibold">{n.dealTitulo}</span>
+                        {n.tipo === "novo_negocio" ? (
+                          <>
+                            Novo negócio na sua área:{" "}
+                            <span className="font-semibold">{n.dealTitulo}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-semibold">{n.deNome}</span> marcou você em{" "}
+                            <span className="font-semibold">{n.dealTitulo}</span>
+                          </>
+                        )}
                       </p>
                       <p className="text-[12px] text-text-gray line-clamp-2">{n.trecho}</p>
                       <p className="text-[11px] text-text-faint mt-0.5">{formatar(n.criadoEm)}</p>

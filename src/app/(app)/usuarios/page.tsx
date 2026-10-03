@@ -3,11 +3,17 @@
 import { useEffect, useState } from "react";
 import { Shield, UserPlus, X } from "lucide-react";
 import { CARGOS } from "@/lib/db/cargos";
+import { FUNCOES } from "@/lib/db/funcoes";
 import { permissoesDoCargo, PERMISSOES } from "@/lib/db/permissoes";
-import { fetchAllUsuarios, UsuarioDoc, atualizarCargoUsuario } from "@/lib/firebase/firestore";
+import {
+  fetchAllUsuarios,
+  UsuarioDoc,
+  atualizarCargoUsuario,
+  atualizarFuncaoUsuario,
+} from "@/lib/firebase/firestore";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { auth } from "@/lib/firebase/config";
-import { CargoId } from "@/lib/types";
+import { CargoId, FuncaoId } from "@/lib/types";
 
 type UsuarioRow = UsuarioDoc & { id: string };
 
@@ -48,14 +54,32 @@ export default function UsuariosPage() {
     }
   }
 
+  async function handleFuncaoChange(usuarioId: string, novaFuncao: FuncaoId | "") {
+    setSavingId(usuarioId);
+    try {
+      await atualizarFuncaoUsuario(usuarioId, novaFuncao);
+      setUsuarios((prev) =>
+        prev
+          ? prev.map((u) => (u.id === usuarioId ? { ...u, funcao: novaFuncao || undefined } : u))
+          : prev
+      );
+    } catch (err) {
+      console.error(err);
+      setError("Não foi possível atualizar a função. Tente novamente.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display font-bold text-xl text-text-dark mb-1">Equipe</h1>
           <p className="text-[13px] text-text-gray">
-            Usuários e cargos do CRM. Cada cargo define o que a pessoa enxerga — menus, funis e widgets do
-            Dashboard.
+            Usuários e cargos do CRM. O cargo define o que a pessoa enxerga — menus, funis e widgets do
+            Dashboard. A função define quem é avisado em cada etapa (ex.: Engenharia recebe os projetos
+            novos).
           </p>
         </div>
         {isAdmin && (
@@ -92,20 +116,21 @@ export default function UsuariosPage() {
               <th className="px-4 py-3 font-medium">Usuário</th>
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Cargo</th>
+              <th className="px-4 py-3 font-medium">Função</th>
               <th className="px-4 py-3 font-medium">Permissões</th>
             </tr>
           </thead>
           <tbody>
             {usuarios === null && !error && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-[13px] text-text-faint">
+                <td colSpan={5} className="px-4 py-6 text-center text-[13px] text-text-faint">
                   Carregando usuários do Firestore...
                 </td>
               </tr>
             )}
             {usuarios?.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-[13px] text-text-faint">
+                <td colSpan={5} className="px-4 py-6 text-center text-[13px] text-text-faint">
                   Nenhum usuário cadastrado ainda. Clique em &quot;Adicionar usuário&quot; pra criar o
                   primeiro.
                 </td>
@@ -143,6 +168,27 @@ export default function UsuariosPage() {
                       <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium px-2 py-1 rounded-md bg-panel-bg text-text-gray">
                         <Shield size={11} />
                         {cargo?.nome ?? u.cargoId}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {isAdmin ? (
+                      <select
+                        value={u.funcao ?? ""}
+                        disabled={savingId === u.id}
+                        onChange={(e) => handleFuncaoChange(u.id, e.target.value as FuncaoId | "")}
+                        className="text-[11.5px] font-medium px-2 py-1.5 rounded-md border border-border bg-panel-bg text-text-gray outline-none disabled:opacity-60"
+                      >
+                        <option value="">Sem função</option>
+                        {FUNCOES.map((fn) => (
+                          <option key={fn.id} value={fn.id}>
+                            {fn.nome}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[11.5px] text-text-gray">
+                        {FUNCOES.find((fn) => fn.id === u.funcao)?.nome ?? "—"}
                       </span>
                     )}
                   </td>
@@ -187,6 +233,7 @@ function AddUsuarioForm({ onClose, onCreated }: { onClose: () => void; onCreated
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [cargoId, setCargoId] = useState<CargoId>("vendedor");
+  const [funcao, setFuncao] = useState<FuncaoId | "">("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -202,7 +249,13 @@ function AddUsuarioForm({ onClose, onCreated }: { onClose: () => void; onCreated
       const res = await fetch("/api/admin/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ nome: nome.trim(), email: email.trim(), senha, cargoId }),
+        body: JSON.stringify({
+          nome: nome.trim(),
+          email: email.trim(),
+          senha,
+          cargoId,
+          funcao: funcao || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Não foi possível criar o usuário.");
@@ -272,6 +325,21 @@ function AddUsuarioForm({ onClose, onCreated }: { onClose: () => void; onCreated
             {CARGOS.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold text-text-gray mb-1.5">Função na equipe</label>
+          <select
+            value={funcao}
+            onChange={(e) => setFuncao(e.target.value as FuncaoId | "")}
+            className="w-full rounded-lg bg-panel-bg border border-border px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+          >
+            <option value="">Sem função</option>
+            {FUNCOES.map((fn) => (
+              <option key={fn.id} value={fn.id}>
+                {fn.nome}
               </option>
             ))}
           </select>

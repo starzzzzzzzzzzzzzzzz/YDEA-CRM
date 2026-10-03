@@ -6,11 +6,12 @@ export type Notificacao = {
   id: string;
   /** UID de quem recebe a notificação. */
   usuarioId: string;
-  tipo: "mencao";
+  tipo: "mencao" | "novo_negocio";
   dealId: string;
   dealTitulo: string;
-  anotacaoId: string;
-  /** Quem marcou. */
+  /** Só nas menções. */
+  anotacaoId?: string;
+  /** Quem marcou (menção) ou quem passou o card (novo negócio). */
   deId: string;
   deNome: string;
   trecho: string;
@@ -19,6 +20,34 @@ export type Notificacao = {
 };
 
 const COLLECTION = "notificacoes";
+
+/** Avisa quem tem a função da etapa que chegou um card novo (ex.: Engenharia). */
+export async function criarNotificacoesNovoNegocio(dados: {
+  destinatarios: string[];
+  dealId: string;
+  dealTitulo: string;
+  autorId: string;
+  autorNome: string;
+  /** Ex.: "Engenharia · Onboard". */
+  destino: string;
+}): Promise<void> {
+  const criadoEm = new Date().toISOString();
+  await Promise.all(
+    dados.destinatarios.map((usuarioId) =>
+      addDoc(collection(db, COLLECTION), {
+        usuarioId,
+        tipo: "novo_negocio",
+        dealId: dados.dealId,
+        dealTitulo: dados.dealTitulo,
+        deId: dados.autorId,
+        deNome: dados.autorNome,
+        trecho: dados.destino,
+        criadoEm,
+        lida: false,
+      })
+    )
+  );
+}
 
 export async function criarNotificacoesMencao(dados: {
   destinatarios: string[];

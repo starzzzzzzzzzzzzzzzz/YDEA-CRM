@@ -32,3 +32,34 @@ export async function addDocumento(
 export async function removeDocumento(dealId: string, documentoId: string): Promise<void> {
   await deleteDoc(doc(db, "deals", dealId, "documentos", documentoId));
 }
+
+/**
+ * Copia os documentos/fotos de um negócio para outro (usado quando o card passa de funil).
+ * Copia do mais antigo pro mais novo, pra manter a mesma ordem na lista. Um arquivo que
+ * falhar não impede os outros: devolve quantos foram copiados e os nomes dos que falharam.
+ */
+export async function copiarDocumentos(
+  origemId: string,
+  destinoId: string,
+  docs?: DocumentoAnexo[]
+): Promise<{ copiados: number; falhas: string[] }> {
+  const lista = docs ?? (await fetchDocumentos(origemId));
+  const falhas: string[] = [];
+  let copiados = 0;
+  for (const d of [...lista].reverse()) {
+    if (!d.previewUrl) continue;
+    try {
+      await addDocumento(destinoId, {
+        tipo: d.tipo,
+        nome: d.nome,
+        tamanho: d.tamanho,
+        previewUrl: d.previewUrl,
+      });
+      copiados++;
+    } catch (err) {
+      console.error(`Erro ao copiar o documento ${d.nome}:`, err);
+      falhas.push(d.nome);
+    }
+  }
+  return { copiados, falhas };
+}

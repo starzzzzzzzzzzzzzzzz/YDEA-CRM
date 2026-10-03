@@ -53,14 +53,19 @@ export async function createDeal(dados: Omit<Deal, "id" | "createdAt">): Promise
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { documentos, ...dadosSemAnexos } = dados;
 
+  const historicoEtapas = dadosSemAnexos.historicoEtapas ?? [
+    { stageId: dadosSemAnexos.stageId, em: new Date().toISOString() },
+  ];
+
   const payload = stripUndefined({
     ...dadosSemAnexos,
+    historicoEtapas,
     createdAt,
     _createdAt: serverTimestamp(),
   });
 
   const ref = await addDoc(collection(db, COLLECTION), payload);
-  const criado: Deal = { id: ref.id, ...dadosSemAnexos, createdAt };
+  const criado: Deal = { id: ref.id, ...dadosSemAnexos, historicoEtapas, createdAt };
 
   if (documentos?.length) {
     const salvos: DocumentoAnexo[] = [];
@@ -102,6 +107,16 @@ export async function deleteDeal(id: string): Promise<void> {
 /** Duplica um negócio: copia os campos principais (não leva anotações/atividades). */
 export async function duplicateDeal(original: Deal): Promise<Deal> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { id, createdAt, status, motivoPerda, fechadoEm, documentos, ...rest } = original;
+  const {
+    id,
+    createdAt,
+    status,
+    motivoPerda,
+    fechadoEm,
+    documentos,
+    negocioOrigemId,
+    historicoEtapas,
+    ...rest
+  } = original;
   return createDeal({ ...rest, titulo: `${original.titulo} (cópia)`, status: "aberto" });
 }

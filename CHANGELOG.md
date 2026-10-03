@@ -4,6 +4,34 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v17 — Nome automático nos cards criados pela cadeia
+
+Os cards criados automaticamente já nascem com o nome do funil na frente, para dar pra bater o olho e saber onde cada um está:
+- Engenharia: `[ENGENHARIA] Nome do cliente`
+- Pós-Acompanhamento: `[PÓS] Nome do cliente`
+- Pós-NPS: `[PÓS NPS] Nome do cliente`
+
+Se o nome já tiver um prefixo de outro funil, ele é trocado (nunca fica `[PÓS] [ENGENHARIA] ...`). O prefixo de cada funil fica em `PROXIMOS_APOS_GANHO` (`src/lib/funnels.ts`, campo `prefixoTitulo`). A grafia do nome do cliente é mantida como foi digitada.
+
+---
+
+## v16 — Cadeia automática de funis, documentos que acompanham o card e aviso por função
+
+**Ao marcar um negócio como Ganho, o sistema cria sozinho o(s) card(s) do próximo funil:**
+- Comercial (Ganho) → novo negócio em **Engenharia**, etapa "Onboard", e quem tem a função **Engenharia** é avisado no sino.
+- Engenharia (Ganho) → **dois** novos negócios ao mesmo tempo: **Pós-Acompanhamento** (etapa "On board") e **Pós-NPS** (etapa "NPS Comercial").
+- Pós-Acompanhamento e Pós-NPS são o fim da cadeia: marcar Ganho neles não cria nada.
+
+O novo card copia cliente, organização/pessoa, responsável, valor, unidade consumidora e dados do projeto, e **leva junto os documentos e fotos** do negócio de origem. Não copia status, previsão de fechamento nem histórico. Cada card novo guarda `negocioOrigemId`; se o Ganho for marcado de novo, não duplica. Se algo falhar (criar o card, copiar um documento ou avisar a equipe), o negócio continua como Ganho e aparece um aviso na tela. A cadeia fica em `PROXIMOS_APOS_GANHO` (`src/lib/funnels.ts`) — é lá que se estende a cadeia ou se escolhe quem é avisado.
+
+**Função na equipe (novo):** cada usuário pode ter uma função — Comercial, Engenharia, Instalação, Pós-venda ou Financeiro — separada do cargo. Dá para todo mundo ser admin e, ainda assim, cada pessoa ter a sua função; é ela que decide quem recebe os avisos. A função é definida na tela Equipe (e na criação do usuário). Quem não tem função não recebe esses avisos.
+
+**Histórico de etapas:** cada negócio grava `historicoEtapas` (etapa + data/hora) na criação e a cada mudança. Negócios anteriores começam o histórico na próxima movimentação. É a base para os relatórios de tempo por etapa e conversão.
+
+**Limitações:** negócios criados já com status Ganho no formulário não disparam a cadeia (só a ação "Ganho" do painel). Os cards criados antes desta versão não ganham retroativamente nem os documentos nem os avisos.
+
+---
+
 ## v15 — Upload de documentos e fotos do negócio, consertado de vez
 
 **O bug:** anexar um documento/foto num negócio "subia" sem erro, mas nunca aparecia depois. Causa raiz: o Firebase Storage, no plano gratuito (Spark), hoje exige vincular uma conta de faturamento mesmo pra guardar arquivos pequenos — então o upload ficava travado num limbo sem avisar.

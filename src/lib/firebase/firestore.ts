@@ -1,6 +1,6 @@
-import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { collection, deleteField, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "./config";
-import { CargoId } from "@/lib/types";
+import { CargoId, FuncaoId } from "@/lib/types";
 import { stripUndefined } from "./utils";
 
 /**
@@ -16,6 +16,7 @@ export type UsuarioDoc = {
   email: string;
   iniciais: string;
   cargoId: CargoId;
+  funcao?: FuncaoId;
   sobrenome?: string;
   telefone?: string;
   fotoUrl?: string;
@@ -54,6 +55,11 @@ export async function fetchAllUsuarios(): Promise<(UsuarioDoc & { id: string })[
 /** Admin muda o cargo de alguém. */
 export async function atualizarCargoUsuario(usuarioId: string, cargoId: CargoId): Promise<void> {
   await updateDoc(doc(db, "usuarios", usuarioId), stripUndefined({ cargoId }));
+}
+
+/** Muda a função na equipe de alguém (vazio = sem função). */
+export async function atualizarFuncaoUsuario(usuarioId: string, funcao: FuncaoId | ""): Promise<void> {
+  await updateDoc(doc(db, "usuarios", usuarioId), { funcao: funcao || deleteField() });
 }
 
 /** Campos que o próprio usuário pode editar no "Configurações de perfil". */

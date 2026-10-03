@@ -11,6 +11,10 @@ import {
   Temperatura,
   Usuario,
 } from "@/lib/types";
+import { FUNNELS, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
+import { fetchDocumentos, copiarDocumentos } from "@/lib/firebase/documentos";
+import { fetchAllUsuarios } from "@/lib/firebase/firestore";
+import { criarNotificacoesNovoNegocio } from "@/lib/firebase/notificacoes";
 import { MOCK_ORGANIZACOES } from "@/lib/mock-organizacoes";
 import { MOCK_PESSOAS } from "@/lib/mock-pessoas";
 import { MOCK_LEADS } from "@/lib/mock-leads";
@@ -30,6 +34,16 @@ import {
   duplicateDeal as duplicateDealDoc,
 } from "@/lib/firebase/deals";
 
+export type ResultadoCadeia = {
+  criados: { deal: Deal; funilNome: string; etapaNome: string }[];
+  /** Destinos que não conseguimos criar (falha ao gravar). */
+  destinosComErro: number;
+  documentosCopiados: number;
+  documentosComErro: number;
+  pessoasAvisadas: number;
+  avisoFalhou: boolean;
+};
+
 type CrmDataContextValue = {
   organizacoes: Organizacao[];
   pessoas: Pessoa[];
@@ -48,6 +62,11 @@ type CrmDataContextValue = {
   updateDeal: (id: string, patch: Partial<Deal>) => void;
   removeDeal: (id: string) => Promise<void>;
   duplicateDeal: (deal: Deal) => Promise<Deal>;
+  /**
+   * Chamado quando um negócio vira Ganho: cria os cards do(s) próximo(s) funil(is) da cadeia,
+   * leva os documentos junto e avisa a função responsável. Não duplica se já foi criado.
+   */
+  criarNegociosSeguintes: (deal: Deal) => Promise<ResultadoCadeia>;
   addLead: (lead: Omit<Lead, "id" | "stage">) => Lead;
   updateLead: (id: string, patch: Partial<Lead>) => void;
   getOrganizacao: (id?: string) => Organizacao | undefined;
@@ -217,12 +236,120 @@ export function CrmDataProvider({
   }
 
   function updateDeal(id: string, patch: Partial<Deal>) {
+    // Mudou de etapa? Registra no histórico (base para tempo por etapa e conversão).
+    const atual = deals.find((d) => d.id === id);
+    let patchFinal = patch;
+    if (patch.stageId && atual && patch.stageId !== atual.stageId) {
+      patchFinal = {
+        ...patch,
+        historicoEtapas: [
+          ...(atual.historicoEtapas ?? []),
+          { stageId: patch.stageId, em: new Date().toISOString() },
+        ],
+      };
+    }
     // Otimista: reflete na hora na tela (essencial pro drag-and-drop do Kanban não travar),
     // e grava no Firestore em paralelo.
-    setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
-    updateDealDoc(id, patch).catch((err) =>
+    setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patchFinal } : d)));
+    updateDealDoc(id, patchFinal).catch((err) =>
       console.error("Erro ao salvar alteração do negócio no Firestore:", err)
     );
+  }
+
+  async function criarNegociosSeguintes(deal: Deal): Promise<ResultadoCadeia> {
+    const resultado: ResultadoCadeia = {
+      criados: [],
+      destinosComErro: 0,
+      documentosCopiados: 0,
+      documentosComErro: 0,
+      pessoasAvisadas: 0,
+      avisoFalhou: false,
+    };
+    const destinos = PROXIMOS_APOS_GANHO[deal.funnelId] ?? [];
+    if (destinos.length === 0) return resultado;
+
+    // Documentos do negócio de origem: lidos uma vez e levados pra cada card novo.
+    let docs: Awaited<ReturnType<typeof fetchDocumentos>> = [];
+    try {
+      docs = await fetchDocumentos(deal.id);
+    } catch (err) {
+      console.error("Erro ao ler os documentos do negócio:", err);
+    }
+
+    // Copia os dados do negócio (cliente, organização/pessoa, responsável, valor, UC, projeto...),
+    // sem o que é do ciclo anterior (status, anexos, histórico, vínculo).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const {
+      id,
+      createdAt,
+      status,
+      motivoPerda,
+      fechadoEm,
+      documentos,
+      negocioOrigemId,
+      historicoEtapas,
+      previsaoFechamento,
+      ...dados
+    } = deal;
+
+    for (const destino of destinos) {
+      // Já existe card desse funil criado a partir deste negócio? Não duplica.
+      if (deals.some((d) => d.negocioOrigemId === deal.id && d.funnelId === destino.funnelId)) {
+        continue;
+      }
+
+      let novo: Deal;
+      try {
+        novo = await addDeal({
+          ...dados,
+          titulo: tituloComPrefixo(dados.titulo, destino.prefixoTitulo),
+          funnelId: destino.funnelId,
+          stageId: destino.stageId,
+          status: "aberto",
+          negocioOrigemId: deal.id,
+        });
+      } catch (err) {
+        console.error("Erro ao criar o card seguinte:", err);
+        resultado.destinosComErro++;
+        continue;
+      }
+
+      const funil = FUNNELS.find((f) => f.id === destino.funnelId);
+      const etapa = funil?.stages.find((e) => e.id === destino.stageId);
+      resultado.criados.push({
+        deal: novo,
+        funilNome: funil?.name ?? destino.funnelId,
+        etapaNome: etapa?.label ?? destino.stageId,
+      });
+
+      if (docs.length > 0) {
+        const r = await copiarDocumentos(deal.id, novo.id, docs);
+        resultado.documentosCopiados += r.copiados;
+        resultado.documentosComErro += r.falhas.length;
+      }
+
+      if (destino.notificarFuncao) {
+        try {
+          const usuarios = await fetchAllUsuarios();
+          const alvo = usuarios.filter((u) => u.funcao === destino.notificarFuncao).map((u) => u.id);
+          if (alvo.length > 0) {
+            await criarNotificacoesNovoNegocio({
+              destinatarios: alvo,
+              dealId: novo.id,
+              dealTitulo: novo.titulo,
+              autorId: currentUser.id,
+              autorNome: currentUser.nome,
+              destino: `${funil?.name ?? ""} · ${etapa?.label ?? ""}`,
+            });
+          }
+          resultado.pessoasAvisadas += alvo.length;
+        } catch (err) {
+          console.error("Erro ao avisar a equipe do novo card:", err);
+          resultado.avisoFalhou = true;
+        }
+      }
+    }
+    return resultado;
   }
 
   async function removeDeal(id: string): Promise<void> {
@@ -270,6 +397,7 @@ export function CrmDataProvider({
       updateDeal,
       removeDeal,
       duplicateDeal,
+      criarNegociosSeguintes,
       addLead,
       updateLead,
       getOrganizacao,

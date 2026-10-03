@@ -112,7 +112,8 @@ export default function DealDetailPanel({
    * pro card atualizar o ícone na hora, sem esperar um refetch. */
   onAtividadesStatusChange?: (dealId: string, pendente: boolean) => void;
 }) {
-  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal } = useCrmData();
+  const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal, criarNegociosSeguintes } =
+    useCrmData();
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -167,6 +168,7 @@ export default function DealDetailPanel({
       setMotivoPerdaAberto(true);
       return;
     }
+    const jaEstavaGanho = deal!.status === "ganho";
     updateDeal(deal!.id, {
       status,
       fechadoEm: new Date().toISOString(),
@@ -174,6 +176,35 @@ export default function DealDetailPanel({
     });
     setMotivoPerdaAberto(false);
     setMotivoPerda("");
+
+    if (status === "ganho" && !jaEstavaGanho) {
+      try {
+        const r = await criarNegociosSeguintes({ ...deal!, status: "ganho" });
+        if (r.criados.length > 0) {
+          const lista = r.criados.map((c) => `${c.funilNome} (${c.etapaNome})`).join(" e ");
+          showToast(`Ganho 🎉 Cards criados: ${lista}`, "success");
+          if (r.documentosComErro > 0) {
+            showToast(`${r.documentosComErro} documento(s) não foram copiados para o novo card`, "error");
+          }
+          if (r.avisoFalhou) {
+            showToast("Os cards foram criados, mas o aviso para a equipe falhou", "error");
+          }
+          if (r.destinosComErro > 0) {
+            showToast("Um dos cards seguintes não foi criado — avise o suporte", "error");
+          }
+          return;
+        }
+        if (r.destinosComErro > 0) {
+          showToast("Marcado como ganho, mas não consegui criar o card do próximo funil", "error");
+          return;
+        }
+      } catch (err) {
+        console.error("Erro ao criar os cards seguintes:", err);
+        showToast("Marcado como ganho, mas não consegui criar o card do próximo funil", "error");
+        return;
+      }
+    }
+
     showToast(
       status === "ganho" ? "Negócio marcado como ganho 🎉" : "Negócio marcado como perdido",
       status === "ganho" ? "success" : "info"

@@ -1,4 +1,4 @@
-import { Funnel } from "./types";
+import { Funnel, FunnelId, FuncaoId } from "./types";
 
 export const FUNNELS: Funnel[] = [
   {
@@ -70,3 +70,41 @@ export const FUNNELS: Funnel[] = [
     ],
   },
 ];
+
+export type DestinoCadeia = {
+  funnelId: FunnelId;
+  stageId: string;
+  /** Prefixo do nome do card criado, ex.: "ENGENHARIA" → "[ENGENHARIA] Nome do cliente". */
+  prefixoTitulo: string;
+  /** Se informado, quem tem essa função na equipe é avisado no sino quando o card é criado. */
+  notificarFuncao?: FuncaoId;
+};
+
+/**
+ * Cadeia automática: ao marcar um negócio como Ganho, o sistema cria os cards seguintes.
+ * - Comercial → Engenharia (Onboard), avisando quem é da Engenharia.
+ * - Engenharia → Pós-Acompanhamento (On board) E Pós-NPS (NPS Comercial), ao mesmo tempo.
+ * - Pós-Acompanhamento e Pós-NPS são o fim da cadeia (não disparam nada).
+ * Para estender (Gestão Energética, Ampliação) ou avisar outra função, basta editar aqui.
+ */
+export const PROXIMOS_APOS_GANHO: Partial<Record<FunnelId, DestinoCadeia[]>> = {
+  comercial: [{
+      funnelId: "engenharia",
+      stageId: "onboard",
+      prefixoTitulo: "ENGENHARIA",
+      notificarFuncao: "engenharia",
+    },],
+  engenharia: [
+    { funnelId: "pos_acompanhamento", stageId: "on_board", prefixoTitulo: "PÓS" },
+    { funnelId: "pos_nps", stageId: "nps_comercial", prefixoTitulo: "PÓS NPS" },
+  ],
+};
+
+/**
+ * Monta o nome do card da cadeia: troca o prefixo anterior pelo do novo funil.
+ * "[ENGENHARIA] Kauê Silva" + "PÓS" → "[PÓS] Kauê Silva".
+ */
+export function tituloComPrefixo(titulo: string, prefixo: string): string {
+  const base = titulo.replace(/^(\s*\[[^\]]*\]\s*)+/, "").trim() || titulo.trim();
+  return `[${prefixo}] ${base}`;
+}

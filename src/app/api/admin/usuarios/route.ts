@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { CargoId } from "@/lib/types";
+import { CargoId, FuncaoId } from "@/lib/types";
+import { FUNCOES_VALIDAS } from "@/lib/db/funcoes";
 
 const CARGOS_VALIDOS: CargoId[] = [
   "admin",
@@ -46,6 +47,8 @@ export async function POST(req: NextRequest) {
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const senha = typeof body?.senha === "string" ? body.senha : "";
   const cargoId = body?.cargoId as CargoId | undefined;
+  const funcaoBruta = body?.funcao as FuncaoId | undefined;
+  const funcao = funcaoBruta && FUNCOES_VALIDAS.includes(funcaoBruta) ? funcaoBruta : undefined;
 
   if (!nome || !email || !senha || !cargoId) {
     return NextResponse.json({ error: "Preencha nome, e-mail, senha e cargo." }, { status: 400 });
@@ -64,8 +67,9 @@ export async function POST(req: NextRequest) {
       email,
       iniciais: iniciaisDe(nome),
       cargoId,
+      ...(funcao ? { funcao } : {}),
     });
-    return NextResponse.json({ id: created.uid, nome, email, iniciais: iniciaisDe(nome), cargoId });
+    return NextResponse.json({ id: created.uid, nome, email, iniciais: iniciaisDe(nome), cargoId, funcao });
   } catch (err) {
     const code = (err as { errorInfo?: { code?: string } })?.errorInfo?.code;
     const message =
