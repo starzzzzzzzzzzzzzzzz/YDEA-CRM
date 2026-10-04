@@ -42,7 +42,7 @@ const NAV = [
   { href: "/clientes", label: "Clientes", icon: BookUser, active: true, permissaoId: "menu.clientes" },
   { href: "/funil", label: "Funil", icon: Filter, active: true, permissaoId: "menu.funil" },
   { href: "/usuarios", label: "Equipe", icon: Users, active: true, permissaoId: "menu.usuarios" },
-  { href: "#", label: "Atividades", icon: Calendar, active: false, permissaoId: "" },
+  { href: "/atividades", label: "Atividades", icon: Calendar, active: true, permissaoId: "menu.atividades" },
   { href: "#", label: "IA", icon: Sparkles, active: false, permissaoId: "" },
   { href: "#", label: "Financeiro", icon: Wallet, active: false, permissaoId: "" },
 ];
@@ -53,6 +53,7 @@ const TITLES: Record<string, string> = {
   "/clientes": "Clientes",
   "/funil": "Funil",
   "/usuarios": "Equipe",
+  "/atividades": "Atividades",
 };
 
 function pageTitle(pathname: string | null) {

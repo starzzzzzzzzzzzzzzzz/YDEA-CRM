@@ -4,6 +4,24 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v19 — Tela Atividades, lembretes no sino e atividade "dia todo"
+
+**Tela Atividades (menu lateral, antes desativado):** reúne as atividades pendentes dos negócios abertos em três listas — **Hoje**, **Atrasadas** e **Próximas** —, com filtro "Só as minhas" (padrão) ou "Todos os responsáveis". Dá para concluir direto na lista ou abrir o negócio. Nova permissão `menu.atividades`, liberada para todos os cargos.
+
+**Atividade "Dia todo":** o formulário da aba Atividades do negócio agora vem com "Dia todo (sem horário)" marcado por padrão; desmarcando, aparecem os campos de início e fim. Atividades antigas, com horário, continuam como estavam. Atividade de dia todo só fica **atrasada quando o dia termina**; com horário, fica atrasada depois do horário de fim.
+
+**Lembretes no sino:** com o CRM aberto, o sistema confere a cada minuto as atividades de quem está logado e avisa **uma vez** quando uma atividade atrasa ("Atividade atrasada em ...") e **uma vez por dia** quando há atividades para hoje ("Você tem N atividades para hoje"). O aviso tem id fixo no Firestore, então não duplica, mesmo com o CRM aberto em dois lugares. **Limitação:** só avisa quando alguém está com o CRM aberto (abrindo depois, o aviso chega na hora). Lembrete por e-mail ou WhatsApp com o CRM fechado exige um agendador no servidor e ficou para uma próxima etapa.
+
+**Próxima atividade:** ao concluir a última atividade pendente de um negócio (na aba do negócio), o formulário de nova atividade abre sozinho com um aviso; na tela Atividades aparece o botão "Agendar a próxima".
+
+**Ajustes:**
+- O responsável de uma atividade agora é sempre gravado pelo id do usuário (antes, ao escolher outra pessoa na lista, ficava o e-mail). Atividades antigas continuam funcionando.
+- A linha do tempo mostra a hora real de criação do negócio (nos negócios novos), em vez de "00:00".
+
+**Nota técnica:** a tela lê as atividades negócio por negócio (uma leitura por negócio aberto) — não precisa de índice nem de regra nova no Firestore. Se a quantidade de negócios abertos crescer muito, o caminho é migrar para uma consulta de grupo (aí sim com regra e índice).
+
+---
+
 ## v18 — Aviso (sino + e-mail) para a função de cada funil
 
 Cada funil passa a ter uma função responsável, conforme o que a pessoa é na equipe (campo "Função", na tela Equipe):

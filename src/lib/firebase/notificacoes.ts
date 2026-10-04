@@ -1,4 +1,15 @@
-import { addDoc, collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "./config";
 
 /** Notificação que aparece no sino da pessoa marcada (coleção `notificacoes`). */
@@ -6,7 +17,8 @@ export type Notificacao = {
   id: string;
   /** UID de quem recebe a notificação. */
   usuarioId: string;
-  tipo: "mencao" | "novo_negocio";
+  tipo: "mencao" | "novo_negocio" | "atividade_atrasada" | "atividade_hoje";
+  /** Vazio no resumo "atividades para hoje". */
   dealId: string;
   dealTitulo: string;
   /** Só nas menções. */
@@ -20,6 +32,21 @@ export type Notificacao = {
 };
 
 const COLLECTION = "notificacoes";
+
+/**
+ * Grava um lembrete com id FIXO, só se ainda não existir — assim o mesmo lembrete nunca
+ * duplica (nem com o CRM aberto em dois computadores) e, depois de lido, não volta.
+ * Devolve true se criou.
+ */
+export async function criarLembreteUmaVez(
+  id: string,
+  dados: Omit<Notificacao, "id" | "criadoEm" | "lida">
+): Promise<boolean> {
+  const ref = doc(db, COLLECTION, id);
+  if ((await getDoc(ref)).exists()) return false;
+  await setDoc(ref, { ...dados, criadoEm: new Date().toISOString(), lida: false });
+  return true;
+}
 
 /** Avisa quem tem a função da etapa que chegou um card novo (ex.: Engenharia). */
 export async function criarNotificacoesNovoNegocio(dados: {

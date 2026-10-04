@@ -2,6 +2,7 @@ import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where } fr
 import { db } from "./config";
 import { stripUndefined } from "./utils";
 import { Atividade } from "@/lib/types";
+import { AtividadeDoNegocio } from "@/lib/atividades";
 
 function atividadesRef(dealId: string) {
   return collection(db, "deals", dealId, "atividades");
@@ -50,4 +51,27 @@ export async function marcarAtividadeConcluida(
   concluida: boolean
 ): Promise<void> {
   await updateDoc(doc(db, "deals", dealId, "atividades", atividadeId), { concluida });
+}
+
+/**
+ * Atividades PENDENTES de vários negócios, de uma vez (usado na tela Atividades e nos lembretes).
+ * Uma leitura por negócio, em paralelo, com um único filtro de igualdade — não exige índice
+ * composto nem regra especial no Firestore. Um negócio que falhar não derruba os outros.
+ */
+export async function fetchPendentesDosNegocios(dealIds: string[]): Promise<AtividadeDoNegocio[]> {
+  const grupos = await Promise.all(
+    dealIds.map(async (dealId) => {
+      try {
+        const snap = await getDocs(query(atividadesRef(dealId), where("concluida", "==", false)));
+        return snap.docs.map((d) => ({
+          dealId,
+          atividade: { id: d.id, ...(d.data() as Omit<Atividade, "id">) },
+        }));
+      } catch (err) {
+        console.error(`Erro ao ler atividades do negócio ${dealId}:`, err);
+        return [];
+      }
+    })
+  );
+  return grupos.flat();
 }

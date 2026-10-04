@@ -48,6 +48,8 @@ import { criarNotificacoesMencao } from "@/lib/firebase/notificacoes";
 import { useToast } from "@/components/ui/Toast";
 import { fetchAnotacoes, addAnotacao } from "@/lib/firebase/anotacoes";
 import { fetchAtividades, addAtividade, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
+import { useAtividades } from "@/lib/store/AtividadesContext";
+import { quandoTexto } from "@/lib/atividades";
 import { fetchDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
 import DocumentUploadGrid from "./DocumentUploadGrid";
@@ -139,11 +141,19 @@ export default function DealDetailPanel({
   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
   const [usuarios, setUsuarios] = useState<(UsuarioDoc & { id: string })[]>([]);
   const [novaAtividadeAberta, setNovaAtividadeAberta] = useState(false);
+  const { substituirDoNegocio } = useAtividades();
+  // Id do negócio cuja lista de atividades já chegou do Firestore.
+  const [atividadesProntasDe, setAtividadesProntasDe] = useState<string | null>(null);
 
   useEffect(() => {
     if (!dealId) return;
     fetchAnotacoes(dealId).then(setAnotacoes).catch((err) => console.error(err));
-    fetchAtividades(dealId).then(setAtividades).catch((err) => console.error(err));
+    fetchAtividades(dealId)
+      .then((lista) => {
+        setAtividades(lista);
+        setAtividadesProntasDe(dealId);
+      })
+      .catch((err) => console.error(err));
     fetchDocumentos(dealId).then(setDocumentos).catch((err) => console.error(err));
     fetchAllUsuarios().then(setUsuarios).catch((err) => console.error(err));
   }, [dealId]);
@@ -154,6 +164,13 @@ export default function DealDetailPanel({
     onAtividadesStatusChange?.(dealId, atividades.some((a) => !a.concluida));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atividades, dealId]);
+
+  // Mantém a tela Atividades e os lembretes em sincronia com o que acontece aqui.
+  // Só depois que a lista deste negócio chegou — senão a lista vazia do início apagaria
+  // as pendências dele por um instante.
+  useEffect(() => {
+    if (atividadesProntasDe === dealId) substituirDoNegocio(dealId, atividades);
+  }, [atividades, atividadesProntasDe, dealId, substituirDoNegocio]);
 
   const funnel = deal ? FUNNELS.find((f) => f.id === deal.funnelId) : undefined;
   const organizacao = getOrganizacao(deal?.organizacaoId);
@@ -781,7 +798,7 @@ function AtividadesTab({
   dealId: string;
   atividades: Atividade[];
   setAtividades: (fn: (prev: Atividade[]) => Atividade[]) => void;
-  usuarios: UsuarioDoc[];
+  usuarios: (UsuarioDoc & { id: string })[];
   currentUser: { id: string; nome: string } | null;
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -791,6 +808,7 @@ function AtividadesTab({
   const [titulo, setTitulo] = useState("");
   const [prioridade, setPrioridade] = useState<DealPrioridade>("media");
   const [data, setData] = useState("");
+  const [diaTodo, setDiaTodo] = useState(true);
   const [horaInicio, setHoraInicio] = useState("");
   const [horaFim, setHoraFim] = useState("");
   const [responsavelId, setResponsavelId] = useState("");
@@ -802,7 +820,7 @@ function AtividadesTab({
 
   async function handleSalvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!titulo.trim() || !data || !horaInicio || !horaFim) return;
+    if (!titulo.trim() || !data || (!diaTodo && (!horaInicio || !horaFim))) return;
     const resp = usuarios.find((u) => u.email === responsavelId);
     setSalvando(true);
     try {
@@ -811,15 +829,18 @@ function AtividadesTab({
         titulo: titulo.trim(),
         prioridade,
         data,
-        horaInicio,
-        horaFim,
-        responsavelId: responsavelId || currentUser?.id || "",
+        diaTodo,
+        horaInicio: diaTodo ? "" : horaInicio,
+        horaFim: diaTodo ? "" : horaFim,
+        // Sempre o UID da pessoa (o select usa o e-mail só como valor da opção).
+        responsavelId: resp?.id ?? currentUser?.id ?? "",
         responsavelNome: resp?.nome ?? currentUser?.nome ?? "—",
         observacoes: observacoes.trim() || undefined,
       });
       setAtividades((prev) => [...prev, nova]);
       setTitulo("");
       setData("");
+      setDiaTodo(true);
       setHoraInicio("");
       setHoraFim("");
       setObservacoes("");
@@ -834,11 +855,18 @@ function AtividadesTab({
   }
 
   async function handleToggle(a: Atividade) {
+    // Concluiu a última atividade pendente? Abre o formulário pra agendar a próxima —
+    // negócio sem próxima atividade é negócio que esfria.
+    const ficouSemPendente = !a.concluida && !atividades.some((x) => x.id !== a.id && !x.concluida);
     setAtividades((prev) => prev.map((x) => (x.id === a.id ? { ...x, concluida: !x.concluida } : x)));
     try {
       await marcarAtividadeConcluida(dealId, a.id, !a.concluida);
     } catch (err) {
       console.error(err);
+    }
+    if (ficouSemPendente) {
+      setOpen(true);
+      showToast("Atividade concluída. Agende a próxima para o negócio não ficar parado", "info");
     }
   }
 
@@ -890,7 +918,7 @@ function AtividadesTab({
               className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${diaTodo ? "grid-cols-1" : "grid-cols-3"}`}>
             <div>
               <label className="block text-[11px] font-semibold text-text-gray mb-1">Data</label>
               <input
@@ -901,27 +929,40 @@ function AtividadesTab({
                 className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-text-gray mb-1">Início</label>
-              <input
-                type="time"
-                value={horaInicio}
-                onChange={(e) => setHoraInicio(e.target.value)}
-                required
-                className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-text-gray mb-1">Fim</label>
-              <input
-                type="time"
-                value={horaFim}
-                onChange={(e) => setHoraFim(e.target.value)}
-                required
-                className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
-              />
-            </div>
+            {!diaTodo && (
+              <>
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-gray mb-1">Início</label>
+                  <input
+                    type="time"
+                    value={horaInicio}
+                    onChange={(e) => setHoraInicio(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-text-gray mb-1">Fim</label>
+                  <input
+                    type="time"
+                    value={horaFim}
+                    onChange={(e) => setHoraFim(e.target.value)}
+                    required
+                    className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+                  />
+                </div>
+              </>
+            )}
           </div>
+          <label className="flex items-center gap-2 text-[12.5px] text-text-gray cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={diaTodo}
+              onChange={(e) => setDiaTodo(e.target.checked)}
+              className="h-4 w-4 accent-[var(--brand)]"
+            />
+            Dia todo (sem horário)
+          </label>
           <div>
             <label className="block text-[11px] font-semibold text-text-gray mb-1">Responsável</label>
             <select
@@ -1023,8 +1064,7 @@ function AtividadeRow({ atividade, onToggle }: { atividade: Atividade; onToggle:
           {ATIVIDADE_TIPO_LABEL[atividade.tipo]} · {atividade.titulo}
         </p>
         <p className="text-[11.5px] text-text-faint mt-0.5">
-          {new Date(atividade.data + "T00:00:00").toLocaleDateString("pt-BR")} · {atividade.horaInicio}–
-          {atividade.horaFim} · {atividade.responsavelNome}
+          {quandoTexto(atividade)} · {atividade.responsavelNome}
         </p>
         {atividade.observacoes && <p className="text-[12px] text-text-gray mt-1">{atividade.observacoes}</p>}
       </div>
@@ -1071,7 +1111,11 @@ function TimelineTab({
   const [filtro, setFiltro] = useState<(typeof TIMELINE_FILTROS)[number]["id"]>("todas");
 
   const entradas: TimelineEntry[] = useMemo(() => {
-    const criado: TimelineEntry = { kind: "criado", ts: `${deal.createdAt}T00:00:00` };
+    // Negócios novos guardam a hora exata no histórico de etapas; os antigos só têm a data.
+    const criado: TimelineEntry = {
+      kind: "criado",
+      ts: deal.historicoEtapas?.[0]?.em ?? `${deal.createdAt}T00:00:00`,
+    };
     const doasAnotacoes: TimelineEntry[] = anotacoes.map((a) => ({
       kind: "anotacao",
       ts: a.criadoEm,
@@ -1085,7 +1129,7 @@ function TimelineTab({
     return [criado, ...doasAnotacoes, ...dasAtividades].sort(
       (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
     );
-  }, [deal.createdAt, anotacoes, atividades]);
+  }, [deal.createdAt, deal.historicoEtapas, anotacoes, atividades]);
 
   const filtradas = entradas.filter((e) => {
     if (filtro === "todas") return true;
@@ -1191,8 +1235,7 @@ function TimelineTab({
                     {ATIVIDADE_TIPO_LABEL[at.tipo]}
                   </span>
                   <p className="text-[12.5px] text-text-gray mt-1.5">
-                    {new Date(at.data + "T00:00:00").toLocaleDateString("pt-BR")} · {at.horaInicio} até{" "}
-                    {at.horaFim}
+                    {quandoTexto(at)}
                   </p>
                   <button
                     onClick={() => handleToggle(at)}

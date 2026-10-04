@@ -149,8 +149,10 @@ export type Atividade = {
   titulo: string;
   prioridade: DealPrioridade;
   data: string; // YYYY-MM-DD
-  horaInicio: string; // HH:mm
-  horaFim: string; // HH:mm
+  /** "Dia todo": sem horário (horaInicio/horaFim ficam vazios). Atividades antigas têm horário. */
+  diaTodo?: boolean;
+  horaInicio: string; // HH:mm — vazio quando diaTodo
+  horaFim: string; // HH:mm — vazio quando diaTodo
   responsavelId: string;
   responsavelNome: string;
   observacoes?: string;

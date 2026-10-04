@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, AtSign, Inbox } from "lucide-react";
+import { Bell, AtSign, Inbox, CalendarClock } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import {
   Notificacao,
@@ -38,6 +38,11 @@ export default function NotificacoesBell() {
   function abrir(n: Notificacao) {
     if (!n.lida) marcarComoLida(n.id).catch((err) => console.error(err));
     setAberto(false);
+    // Resumo "atividades para hoje" não é de um negócio: leva pra tela Atividades.
+    if (!n.dealId) {
+      router.push("/atividades");
+      return;
+    }
     if (window.location.pathname.startsWith("/funil")) {
       window.dispatchEvent(new CustomEvent("abrir-negocio", { detail: n.dealId }));
     } else {
@@ -95,11 +100,23 @@ export default function NotificacoesBell() {
                     }`}
                   >
                     <div className="h-7 w-7 rounded-full bg-brand-soft text-brand-strong flex items-center justify-center shrink-0 mt-0.5">
-                      {n.tipo === "novo_negocio" ? <Inbox size={13} /> : <AtSign size={13} />}
+                      {n.tipo === "novo_negocio" ? (
+                        <Inbox size={13} />
+                      ) : n.tipo === "atividade_atrasada" || n.tipo === "atividade_hoje" ? (
+                        <CalendarClock size={13} />
+                      ) : (
+                        <AtSign size={13} />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[12.5px] text-text-dark">
-                        {n.tipo === "novo_negocio" ? (
+                        {n.tipo === "atividade_hoje" ? (
+                          <span className="font-semibold">{n.trecho}</span>
+                        ) : n.tipo === "atividade_atrasada" ? (
+                          <>
+                            Atividade atrasada em <span className="font-semibold">{n.dealTitulo}</span>
+                          </>
+                        ) : n.tipo === "novo_negocio" ? (
                           <>
                             Novo negócio na sua área:{" "}
                             <span className="font-semibold">{n.dealTitulo}</span>
@@ -111,7 +128,9 @@ export default function NotificacoesBell() {
                           </>
                         )}
                       </p>
-                      <p className="text-[12px] text-text-gray line-clamp-2">{n.trecho}</p>
+                      {n.tipo !== "atividade_hoje" && (
+                        <p className="text-[12px] text-text-gray line-clamp-2">{n.trecho}</p>
+                      )}
                       <p className="text-[11px] text-text-faint mt-0.5">{formatar(n.criadoEm)}</p>
                     </div>
                     {!n.lida && <span className="h-2 w-2 rounded-full bg-brand shrink-0 mt-2" />}
