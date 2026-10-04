@@ -16,9 +16,7 @@ import { enviarEmailNovoCard } from "@/lib/notificarEmail";
 import { fetchDocumentos, copiarDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios } from "@/lib/firebase/firestore";
 import { criarNotificacoesNovoNegocio } from "@/lib/firebase/notificacoes";
-import { MOCK_ORGANIZACOES } from "@/lib/mock-organizacoes";
-import { MOCK_PESSOAS } from "@/lib/mock-pessoas";
-import { MOCK_LEADS } from "@/lib/mock-leads";
+import { fetchLeads, addLeadDoc, updateLeadDoc } from "@/lib/firebase/leads";
 import { fetchClientes, createCliente } from "@/lib/firebase/clientes";
 import {
   fetchOrganizacoes,
@@ -68,7 +66,7 @@ type CrmDataContextValue = {
    * leva os documentos junto e avisa a função responsável. Não duplica se já foi criado.
    */
   criarNegociosSeguintes: (deal: Deal) => Promise<ResultadoCadeia>;
-  addLead: (lead: Omit<Lead, "id" | "stage">) => Lead;
+  addLead: (lead: Omit<Lead, "id" | "stage">) => Promise<Lead>;
   updateLead: (id: string, patch: Partial<Lead>) => void;
   getOrganizacao: (id?: string) => Organizacao | undefined;
   getPessoa: (id?: string) => Pessoa | undefined;
@@ -90,33 +88,35 @@ export function CrmDataProvider({
   /** Usuário logado — vem do AuthContext (Firebase Auth + Firestore), resolvido no layout do grupo (app). */
   currentUser: Usuario;
 }) {
-  const [organizacoes, setOrganizacoes] = useState<Organizacao[]>(MOCK_ORGANIZACOES);
-  const [pessoas, setPessoas] = useState<Pessoa[]>(MOCK_PESSOAS);
+  const [organizacoes, setOrganizacoes] = useState<Organizacao[]>([]);
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [clientesLoading, setClientesLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(true);
-  // Leads ainda são dado fictício em memória — próxima frente a migrar pro Firestore.
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [leads, setLeads] = useState<Lead[]>([]);
 
-  // Organizações e pessoas criadas no Funil ficam no Firestore; os dados fictícios
-  // continuam na lista (por último) só pra não quebrar negócios antigos que apontam pra eles.
+  // Organizações, pessoas e leads ficam no Firestore.
   useEffect(() => {
     let cancelado = false;
     fetchOrganizacoes()
       .then((rows) => {
         if (cancelado) return;
-        const ids = new Set(rows.map((r) => r.id));
-        setOrganizacoes([...rows, ...MOCK_ORGANIZACOES.filter((m) => !ids.has(m.id))]);
+        setOrganizacoes(rows);
       })
       .catch((err) => console.error("Erro ao carregar organizações do Firestore:", err));
     fetchPessoas()
       .then((rows) => {
         if (cancelado) return;
-        const ids = new Set(rows.map((r) => r.id));
-        setPessoas([...rows, ...MOCK_PESSOAS.filter((m) => !ids.has(m.id))]);
+        setPessoas(rows);
       })
       .catch((err) => console.error("Erro ao carregar pessoas do Firestore:", err));
+    fetchLeads()
+      .then((rows) => {
+        if (cancelado) return;
+        setLeads(rows);
+      })
+      .catch((err) => console.error("Erro ao carregar leads do Firestore:", err));
     return () => {
       cancelado = true;
     };
@@ -395,14 +395,17 @@ export function CrmDataProvider({
     return copia;
   }
 
-  function addLead(lead: Omit<Lead, "id" | "stage">): Lead {
-    const full: Lead = { ...lead, id: `l${Date.now()}`, stage: "novo_lead" };
+  async function addLead(lead: Omit<Lead, "id" | "stage">): Promise<Lead> {
+    const full = await addLeadDoc({ ...lead, stage: "novo_lead", criadoEm: new Date().toISOString() });
     setLeads((prev) => [full, ...prev]);
     return full;
   }
 
   function updateLead(id: string, patch: Partial<Lead>) {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    const dados = { ...patch };
+    delete dados.id;
+    updateLeadDoc(id, dados).catch((err) => console.error("Erro ao atualizar o lead:", err));
   }
 
   function getOrganizacao(id?: string) {

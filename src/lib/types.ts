@@ -318,6 +318,8 @@ export type Lead = {
   valor: number;
   responsavel: string;
   tags: string[];
+  /** Quando o lead foi criado (ISO), usado pra ordenar a lista. */
+  criadoEm?: string;
 };
 
 // --- Clientes (Cadastro) ---

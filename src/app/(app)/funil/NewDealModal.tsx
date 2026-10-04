@@ -37,7 +37,7 @@ import {
   TEMPERATURA_LABEL,
 } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
-import { CANAIS_ORIGEM } from "@/lib/mock-team";
+import { CANAIS_ORIGEM } from "@/lib/constants";
 import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
 import { maskCurrencyDigits, currencyDigitsToNumber } from "@/lib/masks";
 

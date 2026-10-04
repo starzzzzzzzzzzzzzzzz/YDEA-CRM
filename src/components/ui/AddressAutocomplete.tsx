@@ -1,93 +1,75 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { MapPin, Loader2 } from "lucide-react";
-import { searchPlaces, PlaceSuggestion } from "@/lib/mock-places";
+import { maskCEP, onlyDigits } from "@/lib/masks";
 
-export default function AddressAutocomplete({
-  onSelect,
-}: {
-  onSelect: (place: PlaceSuggestion) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<PlaceSuggestion[]>([]);
+export type EnderecoCep = {
+  endereco: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+};
+
+/**
+ * Busca de endereço pelo CEP (serviço público ViaCEP, sem chave). Ao completar os 8 dígitos,
+ * devolve rua, bairro, cidade e estado; o número a pessoa preenche.
+ */
+export default function AddressAutocomplete({ onSelect }: { onSelect: (endereco: EnderecoCep) => void }) {
+  const [cep, setCep] = useState("");
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
-
-  function handleChange(v: string) {
-    setQuery(v);
-    setOpen(true);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (v.trim().length < 3) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
+  async function buscar(digitos: string) {
     setLoading(true);
-    debounceRef.current = setTimeout(async () => {
-      const r = await searchPlaces(v);
-      setResults(r);
+    setAviso(null);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digitos}/json/`);
+      if (!res.ok) throw new Error(`ViaCEP respondeu ${res.status}`);
+      const d = await res.json();
+      if (d.erro) {
+        setAviso("CEP não encontrado. Confira os números ou preencha à mão.");
+        return;
+      }
+      onSelect({
+        endereco: d.logradouro ?? "",
+        bairro: d.bairro ?? "",
+        cidade: d.localidade ?? "",
+        estado: d.uf ?? "",
+        cep: d.cep ?? maskCEP(digitos),
+      });
+      setAviso("Endereço preenchido. Complete o número.");
+    } catch (err) {
+      console.error("Erro ao consultar o CEP:", err);
+      setAviso("Não foi possível consultar o CEP agora. Preencha o endereço à mão.");
+    } finally {
       setLoading(false);
-    }, 200);
+    }
+  }
+
+  function handleChange(valor: string) {
+    const mascarado = maskCEP(valor);
+    setCep(mascarado);
+    setAviso(null);
+    const digitos = onlyDigits(mascarado);
+    if (digitos.length === 8) void buscar(digitos);
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div>
       <div className="w-full flex items-center gap-2 rounded-lg border border-border bg-panel-bg px-3.5 py-2.5 focus-within:border-brand focus-within:ring-1 focus-within:ring-brand transition-colors">
         <MapPin size={15} className="text-text-faint shrink-0" />
         <input
-          value={query}
+          value={cep}
           onChange={(e) => handleChange(e.target.value)}
-          onFocus={() => setOpen(true)}
-          placeholder="Buscar endereço (Google Places)"
+          inputMode="numeric"
+          placeholder="Buscar endereço pelo CEP (00000-000)"
           className="w-full bg-transparent outline-none placeholder:text-text-faint text-sm text-text-dark"
         />
         {loading && <Loader2 size={14} className="animate-spin-slow text-text-faint shrink-0" />}
       </div>
-
-      {open && (query.trim().length >= 3 || results.length > 0) && (
-        <div className="absolute z-30 mt-1.5 w-full rounded-xl border border-border bg-card-bg/95 backdrop-blur-md shadow-lg overflow-hidden animate-dropdown-in">
-          {loading ? (
-            <div className="p-1.5 space-y-1.5">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-9 mx-1.5 rounded-lg bg-panel-bg animate-skeleton" />
-              ))}
-            </div>
-          ) : results.length === 0 ? (
-            <div className="px-3.5 py-4 text-center text-xs text-text-faint">
-              Nenhum endereço encontrado
-            </div>
-          ) : (
-            <div className="max-h-56 overflow-y-auto py-1.5">
-              {results.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => {
-                    onSelect(r);
-                    setQuery(r.descricao);
-                    setOpen(false);
-                  }}
-                  className="w-full flex items-start gap-2 px-3.5 py-2.5 text-left text-sm hover:bg-panel-bg transition-colors"
-                >
-                  <MapPin size={14} className="text-brand-strong shrink-0 mt-0.5" />
-                  <span className="text-text-dark">{r.descricao}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {aviso && <p className="mt-1.5 text-[11.5px] text-text-faint">{aviso}</p>}
     </div>
   );
 }

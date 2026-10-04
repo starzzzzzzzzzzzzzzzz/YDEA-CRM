@@ -131,13 +131,12 @@ export default function PessoaModal({
         </div>
 
         <div className="space-y-4">
-          <SectionTitle subtitle="Integrado ao Google Places — selecione para preencher automaticamente">
+          <SectionTitle subtitle="Digite o CEP para preencher rua, bairro, cidade e estado">
             Endereço
           </SectionTitle>
           <AddressAutocomplete
             onSelect={(p) => {
               set("endereco", p.endereco);
-              set("numero", p.numero);
               set("bairro", p.bairro);
               set("cidade", p.cidade);
               set("estado", p.estado);

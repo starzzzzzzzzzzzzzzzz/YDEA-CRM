@@ -5,6 +5,7 @@ import { Search, Plus, Zap, Download } from "lucide-react";
 import { Lead, LeadTipo, STAGES, StageId, TIPO_LABEL } from "@/lib/types";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import NewLeadModal from "./NewLeadModal";
+import { useToast } from "@/components/ui/Toast";
 
 const TAG_STYLES: Record<string, string> = {
   urgente: "bg-badge-red-bg text-badge-red-text",
@@ -22,6 +23,7 @@ function formatBRL(value: number) {
 
 export default function LeadsTable() {
   const { leads, addLead } = useCrmData();
+  const { showToast } = useToast();
   const [busca, setBusca] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<LeadTipo | "todos">("todos");
   const [stageFiltro, setStageFiltro] = useState<StageId | "todas">("todas");
@@ -41,9 +43,14 @@ export default function LeadsTable() {
 
   const valorTotal = filtrados.reduce((sum, l) => sum + l.valor, 0);
 
-  function handleCreate(newLead: Omit<Lead, "id" | "stage">) {
-    addLead(newLead);
-    setModalOpen(false);
+  async function handleCreate(newLead: Omit<Lead, "id" | "stage">) {
+    try {
+      await addLead(newLead);
+      setModalOpen(false);
+    } catch (err) {
+      console.error("Erro ao salvar o lead:", err);
+      showToast("Não foi possível salvar o lead. Tente novamente.", "info");
+    }
   }
 
   return (

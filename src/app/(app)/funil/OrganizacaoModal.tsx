@@ -191,19 +191,16 @@ export default function OrganizacaoModal({
         </div>
 
         <div className="space-y-4">
-          <SectionTitle subtitle="Integrado ao Google Places — selecione para preencher automaticamente">
+          <SectionTitle subtitle="Digite o CEP para preencher rua, bairro, cidade e estado">
             Endereço
           </SectionTitle>
           <AddressAutocomplete
             onSelect={(p) => {
               set("endereco", p.endereco);
-              set("numero", p.numero);
               set("bairro", p.bairro);
               set("cidade", p.cidade);
               set("estado", p.estado);
               set("cep", p.cep);
-              set("latitude", p.latitude);
-              set("longitude", p.longitude);
             }}
           />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
