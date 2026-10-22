@@ -1,6 +1,44 @@
-import { InputDimensionamento, ResultadoCalculoSolar } from './types';
+export interface ItemComplementarInput {
+  nome: string;
+  operacao: 'Valor fixo' | 'Percentual material' | 'Percentual Total' | 'Personalizado';
+  valorUnitario: number;
+  quantidade: number;
+  aliquotaImposto: number; // Ex: 0.1358 para 13,58%
+}
 
-export function calcularPropostaSolar(input: InputDimensionamento): ResultadoCalculoSolar {
+export interface InputDimensionamentoAvancado {
+  tipoFase: 'monofasico' | 'bifasico' | 'trifasico';
+  consumoMensal: number;
+  irradiancia: number;
+  taxaDesempenho: number;
+  potenciaModuloW: number;
+  areaModuloM2: number;
+  valorKitMaterial: number;
+  itensComplementares: ItemComplementarInput[];
+  percentualComissao: number; // Ex: 0.03 para 3%
+}
+
+export interface ResultadoCalculoSolarAvancado {
+  geracaoEspecifica: number;
+  kwpNecessario: number;
+  qtdModulos: number;
+  kwpReal: number;
+  areaEstimada: number;
+  totalItensSemImposto: number;
+  totalImpostoPago: number;
+  totalItensComImposto: number;
+  valorComissao: number;
+  valorTotalProposta: number;
+  precoPorKwp: number;
+  detalhesItens: Array<{
+    nome: string;
+    valorTotal: number;
+    impostoPago: number;
+    valorComImposto: number;
+  }>;
+}
+
+export function calcularPropostaSolarAvancada(input: InputDimensionamentoAvancado): ResultadoCalculoSolarAvancado {
   // A. Custo de disponibilidade baseado na fase da rede (kWh)
   const custoDisponibilidade = 
     input.tipoFase === 'monofasico' ? 30 :
@@ -11,10 +49,12 @@ export function calcularPropostaSolar(input: InputDimensionamento): ResultadoCal
 
   // C. kWp Necessário
   const consumoAjustado = Math.max(0, input.consumoMensal - custoDisponibilidade);
-  const kwpNecessario = consumoAjustado / geracaoEspecifica;
+  const kwpNecessario = geracaoEspecifica > 0 ? consumoAjustado / geracaoEspecifica : 0;
 
   // D. Quantidade de Módulos (arredondado para cima)
-  const qtdModulos = Math.ceil((kwpNecessario * 1000) / input.potenciaModuloW);
+  const qtdModulos = input.potenciaModuloW > 0 
+    ? Math.ceil((kwpNecessario * 1000) / input.potenciaModuloW) 
+    : 0;
 
   // E. Potência Real Instalada da Usina (kWp)
   const kwpReal = (qtdModulos * input.potenciaModuloW) / 1000;
@@ -22,25 +62,42 @@ export function calcularPropostaSolar(input: InputDimensionamento): ResultadoCal
   // F. Área Estimada Ocupada (m²)
   const areaEstimada = qtdModulos * input.areaModuloM2;
 
-  // G. Imposto Gross-Up dos Itens Complementares (Alíquota de 13.58%)
-  const aliquotaImpostoComplementares = 0.1358;
-  const complementaresComImposto = input.valorComplementaresBase / (1 - aliquotaImpostoComplementares);
+  // G. Cálculo dos Itens Complementares com Gross-Up de Impostos individual ou geral
+  let totalItensSemImposto = 0;
+  let totalImpostoPago = 0;
+  let totalItensComImposto = 0;
 
-  // H. Mão de Obra de Instalação (R$ 80,00 por módulo)
-  const valorInstalacao = qtdModulos * 80;
+  const detalhesItens = input.itensComplementares.map(item => {
+    let baseCalculo = item.valorUnitario * item.quantidade;
 
-  // I. Valor sobre o Kit Material (50% sobre o custo do kit)
-  const valorSobreKit = input.valorKitMaterial * 0.50;
+    if (item.operacao === 'Percentual material') {
+      baseCalculo = input.valorKitMaterial * (item.valorUnitario / 100) * item.quantidade;
+    }
 
-  // J. Subtotal sem comissão
-  const subtotalProposta = input.valorKitMaterial + complementaresComImposto + valorInstalacao + valorSobreKit;
+    // Gross-up do imposto do item
+    const valorComImposto = baseCalculo / (1 - item.aliquotaImposto);
+    const impostoPago = valorComImposto - baseCalculo;
 
-  // K. Comissão do Vendedor via Gross-Up (Alíquota de 3%)
-  const aliquotaComissao = 0.03;
-  const valorTotalProposta = subtotalProposta / (1 - aliquotaComissao);
-  const valorComissao = valorTotalProposta * aliquotaComissao;
+    totalItensSemImposto += baseCalculo;
+    totalImpostoPago += impostoPago;
+    totalItensComImposto += valorComImposto;
 
-  // L. Preço por kWp
+    return {
+      nome: item.nome,
+      valorTotal: Number(baseCalculo.toFixed(2)),
+      impostoPago: Number(impostoPago.toFixed(2)),
+      valorComImposto: Number(valorComImposto.toFixed(2))
+    };
+  });
+
+  // H. Subtotal (Kit + Itens Complementares com Imposto)
+  const subtotalProposta = input.valorKitMaterial + totalItensComImposto;
+
+  // I. Comissão do Vendedor via Gross-Up
+  const valorTotalProposta = subtotalProposta / (1 - input.percentualComissao);
+  const valorComissao = valorTotalProposta * input.percentualComissao;
+
+  // J. Preço por kWp
   const precoPorKwp = kwpReal > 0 ? valorTotalProposta / kwpReal : 0;
 
   return {
@@ -49,11 +106,12 @@ export function calcularPropostaSolar(input: InputDimensionamento): ResultadoCal
     qtdModulos,
     kwpReal: Number(kwpReal.toFixed(2)),
     areaEstimada: Number(areaEstimada.toFixed(2)),
-    complementaresComImposto: Number(complementaresComImposto.toFixed(2)),
-    valorInstalacao: Number(valorInstalacao.toFixed(2)),
-    valorSobreKit: Number(valorSobreKit.toFixed(2)),
+    totalItensSemImposto: Number(totalItensSemImposto.toFixed(2)),
+    totalImpostoPago: Number(totalImpostoPago.toFixed(2)),
+    totalItensComImposto: Number(totalItensComImposto.toFixed(2)),
     valorComissao: Number(valorComissao.toFixed(2)),
     valorTotalProposta: Number(valorTotalProposta.toFixed(2)),
-    precoPorKwp: Number(precoPorKwp.toFixed(2))
+    precoPorKwp: Number(precoPorKwp.toFixed(2)),
+    detalhesItens
   };
 }
