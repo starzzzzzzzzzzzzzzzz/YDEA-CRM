@@ -14,7 +14,6 @@ import {
   Wallet,
   Settings,
   HelpCircle,
-  Search,
   Grid3x3,
   ChevronDown,
   Plus,
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
 import NotificacoesBell from "@/components/NotificacoesBell";
+import GlobalSearch from "@/components/GlobalSearch";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
 import { useTheme } from "@/lib/store/ThemeContext";
@@ -151,16 +151,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {pageTitle(pathname)}
           </h1>
 
-          <div className="flex-1 max-w-md relative">
-            <Search
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-faint"
-            />
-            <input
-              placeholder="Pesquisar clientes, leads, negócios..."
-              className="w-full rounded-lg border border-border bg-panel-bg pl-9 pr-3 py-2 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-colors"
-            />
-          </div>
+          <GlobalSearch />
 
           <button className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-text-gray hover:text-text-dark transition-colors shrink-0">
             <Plus size={16} />

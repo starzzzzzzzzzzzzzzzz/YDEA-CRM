@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/lib/store/AuthContext";
 import { CrmDataProvider } from "@/lib/store/CrmDataContext";
+import { AtividadesProvider } from "@/lib/store/AtividadesContext";
 
 export default function AppGroupLayout({
   children,
@@ -35,7 +36,9 @@ export default function AppGroupLayout({
 
   return (
     <CrmDataProvider currentUser={user}>
-      <AppShell>{children}</AppShell>
+      <AtividadesProvider>
+        <AppShell>{children}</AppShell>
+      </AtividadesProvider>
     </CrmDataProvider>
   );
 }
