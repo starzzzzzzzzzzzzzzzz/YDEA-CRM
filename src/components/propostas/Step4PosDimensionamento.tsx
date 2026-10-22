@@ -2,53 +2,126 @@
 
 import React from 'react';
 
-interface Step4Props {
-  formData: {
-    validadeDias: number;
-  };
-  onChange: (field: string, value: any) => void;
-  onSubmit: () => void;
-  onBack: () => void;
+interface Step4PosDimensionamentoProps {
+  formData: any;
+  updateFormData: (data: any) => void;
+  onNext: () => void;
+  onPrev: () => void;
 }
 
-export default function Step4PosDimensionamento({ formData, onChange, onSubmit, onBack }: Step4Props) {
+export default function Step4PosDimensionamento({ formData, updateFormData, onNext, onPrev }: Step4PosDimensionamentoProps) {
+  const handleChange = (field: string, value: any) => {
+    updateFormData({ [field]: value });
+  };
+
   return (
-    <div className="space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-      <h2 className="text-xl font-bold text-gray-800">Etapa 4: Pós-dimensionamento e Validade</h2>
-      
+    <div className="space-y-6 text-slate-100">
+      <div>
+        <h2 className="text-xl font-semibold">Dados Pós-Dimensionamento & Contrato</h2>
+        <p className="text-sm text-slate-400">Preencha as informações da Ordem de Serviço e as cláusulas contratuais da proposta.</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Validade da Proposta (Dias)</label>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Data Início OS</label>
           <input
-            type="number"
-            value={formData.validadeDias}
-            onChange={(e) => onChange('validadeDias', Number(e.target.value))}
-            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            type="date"
+            value={formData.dataInicioOS || ''}
+            onChange={(e) => handleChange('dataInicioOS', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">Padrão: 7 dias para evitar propostas vencidas.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Data Fim OS</label>
+          <input
+            type="date"
+            value={formData.dataFimOS || ''}
+            onChange={(e) => handleChange('dataFimOS', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Número OS</label>
+          <input
+            type="text"
+            placeholder="Campo numérico"
+            value={formData.numeroOS || ''}
+            onChange={(e) => handleChange('numeroOS', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Colaborador Responsável OS</label>
+          <input
+            type="text"
+            placeholder="Nome do colaborador"
+            value={formData.colaboradorOS || ''}
+            onChange={(e) => handleChange('colaboradorOS', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">CPF Colaborador Responsável OS</label>
+          <input
+            type="text"
+            placeholder="000.000.000-00"
+            value={formData.cpfColaboradorOS || ''}
+            onChange={(e) => handleChange('cpfColaboradorOS', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Nacionalidade</label>
+          <input
+            type="text"
+            value={formData.nacionalidade || 'Brasileiro(a)'}
+            onChange={(e) => handleChange('nacionalidade', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm"
+          />
         </div>
       </div>
 
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-        <p className="text-sm text-blue-800">
-          💡 Tudo pronto! Ao avançar, o motor calculará automaticamente a potência, módulos, impostos via gross-up e a proposta estará pronta para gerar o documento.
-        </p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Cláusula 2.1.1</label>
+          <textarea
+            rows={3}
+            value={formData.clausula211 || 'Pagamento no valor de R$ 00000 (VALOR POR ESCRITO) à vista, através de FORMA DE PAGAMENTO, como entrada.'}
+            onChange={(e) => handleChange('clausula211', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">Cláusula 2.1.2</label>
+          <textarea
+            rows={3}
+            value={formData.clausula212 || 'Pagamento no valor de R$ 00000 (VALOR POR ESCRITO) através de FORMA DE PAGAMENTO, na instalação do sistema fotovoltaico.'}
+            onChange={(e) => handleChange('clausula212', e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white text-sm"
+          />
+        </div>
       </div>
 
-      <div className="flex justify-between pt-4 border-t">
+      <div className="flex justify-between pt-4">
         <button
           type="button"
-          onClick={onBack}
-          className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition"
+          onClick={onPrev}
+          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition"
         >
-          &larr; Voltar
+          Voltar
         </button>
         <button
           type="button"
-          onClick={onSubmit}
-          className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-green-700 transition"
+          onClick={onNext}
+          className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition"
         >
-          Gerar Proposta Solar 🚀
+          Prosseguir
         </button>
       </div>
     </div>
