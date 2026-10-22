@@ -1,425 +1,127 @@
-export type FunnelId =
-  | "comercial"
-  | "engenharia"
-  | "pos_acompanhamento"
-  | "pos_nps"
-  | "pos_gestao_energetica"
-  | "pos_ampliacao";
+export interface InputDimensionamento {
+  consumoMensal: number;
+  tipoFase: 'monofasico' | 'bifasico' | 'trifasico';
+  irradiancia: number;
+  taxaDesempenho: number;
+  potenciaModuloW: number;
+  areaModuloM2: number;
+  valorKitMaterial: number;
+  valorComplementaresBase: number;
+}
 
-export type Stage = { id: string; label: string; emoji?: string };
+export interface ResultadoCalculoSolar {
+  geracaoEspecifica: number;
+  kwpNecessario: number;
+  qtdModulos: number;
+  kwpReal: number;
+  areaEstimada: number;
+  complementaresComImposto: number;
+  valorInstalacao: number;
+  valorSobreKit: number;
+  valorComissao: number;
+  valorTotalProposta: number;
+  precoPorKwp: number;
+}
 
-export type Funnel = {
-  id: FunnelId;
-  name: string;
-  stages: Stage[];
-};
+export interface PropostaSolar {
+  id?: string;
+  idDeal?: string;
+  status: 'rascunho' | 'gerada' | 'enviada' | 'aceita';
+  nomeProjeto: string;
+  cliente: {
+    nome: string;
+    cpfCnpj: string;
+    email?: string;
+    telefone?: string;
+  };
+  dadosEntrada: InputDimensionamento;
+  calculos: ResultadoCalculoSolar;
+  criadoEm: string;
+  validadeDias: number; // Padrão: 7 dias
+}
+// ==========================================
+// TIPOS E MAPEAMENTOS DO FUNIL E NEGÓCIOS (CRM)
+// ==========================================
 
-// --- Papéis e usuários (RBAC) ---
-// Os dados (cargos, permissões, cargo_permissões, usuários) vivem em src/lib/db,
-// simulando tabelas de um banco relacional — nada disso fica fixo no código das telas.
+export type DealPrioridade = 'baixa' | 'media' | 'alta' | 'urgente';
 
-export type CargoId =
-  | "admin"
-  | "vendedor"
-  | "projetista"
-  | "financeiro"
-  | "instalacao"
-  | "pos_venda";
-
-/**
- * Função na equipe — separada do cargo (permissões). Dá pra todo mundo ser admin e,
- * mesmo assim, cada pessoa ter a sua função: é ela que define quem recebe os avisos
- * de cada etapa (ex.: quem é de Engenharia é avisado quando chega um projeto novo).
- */
-export type FuncaoId = "comercial" | "engenharia" | "instalacao" | "pos_venda" | "financeiro";
-
-export type Cargo = {
-  id: CargoId;
-  nome: string;
-  descricao: string;
-};
-
-export type Permissao = {
-  id: string;
-  nome: string;
-};
-
-export type CargoPermissao = {
-  cargoId: CargoId;
-  permissaoId: string;
-};
-
-export type Usuario = {
-  id: string;
-  nome: string;
-  email: string;
-  iniciais: string;
-  cargoId: CargoId;
-  /** Função na equipe (opcional) — ver FuncaoId. */
-  funcao?: FuncaoId;
-  /** Campos opcionais de perfil — nem todo usuário antigo tem isso preenchido ainda. */
-  sobrenome?: string;
-  telefone?: string;
-  /** URL da foto de perfil no Firebase Storage (usuarios/{uid}/foto). */
-  fotoUrl?: string;
-  /** Unidade/franquia à qual o usuário pertence — ver lib/db/unidades.ts. */
-  unidadeId?: string;
-};
-
-export type DashboardWidget = {
-  id: string;
-  nome: string;
-  cargoId: CargoId;
-  ordem: number;
-  componente: string;
-  span?: 1 | 2 | 3 | 4;
-};
-
-export type DealPrioridade = "baixa" | "media" | "alta";
-export type DealStatus = "aberto" | "ganho" | "perdido";
-export type PerfilCliente = "residencial" | "comercial" | "rural" | "industrial" | "condominio";
-
-export const PERFIL_CLIENTE_LABEL: Record<PerfilCliente, string> = {
-  residencial: "Residencial",
-  comercial: "Comercial",
-  rural: "Rural",
-  industrial: "Industrial",
-  condominio: "Condomínio",
-};
-
-export type DocumentoTipo =
-  | "conta_energia"
-  | "cpf"
-  | "rg"
-  | "cnh"
-  | "comprovante"
-  | "kit_fotovoltaico"
-  | "projeto"
-  | "drone";
-
-export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
-  conta_energia: "Conta de energia",
-  cpf: "CPF",
-  rg: "RG",
-  cnh: "CNH",
-  comprovante: "Comprovante de residência",
-  kit_fotovoltaico: "Kit fotovoltaico",
-  projeto: "Projeto",
-  drone: "Imagens de drone",
-};
-
-export type DocumentoAnexo = {
-  id: string;
-  tipo: DocumentoTipo;
-  nome: string;
-  tamanho: number;
-  /** Data URL (base64) do arquivo — guardado direto no Firestore, sem Storage. */
-  previewUrl?: string;
-  uploadedAt?: string;
-};
-
-/** Anotação/comentário no negócio (aba "Anotações"). */
-export type Anotacao = {
-  id: string;
-  texto: string;
-  autorId: string;
-  autorNome: string;
-  criadoEm: string; // ISO datetime
-  /** Fotos anexadas (data URL JPEG comprimido), guardadas direto no Firestore. */
-  imagens?: string[];
-  /** UIDs dos colaboradores marcados com @ nesta anotação. */
-  mencoes?: string[];
-};
-
-export type AtividadeTipo = "ligacao" | "reuniao" | "visita" | "email" | "tarefa" | "whatsapp";
+export type AtividadeTipo = 'ligacao' | 'whatsapp' | 'reuniao' | 'visita' | 'email' | 'tarefa';
 
 export const ATIVIDADE_TIPO_LABEL: Record<AtividadeTipo, string> = {
-  ligacao: "Ligação",
-  reuniao: "Reunião",
-  visita: "Visita",
-  email: "E-mail",
-  tarefa: "Tarefa",
-  whatsapp: "WhatsApp",
+  ligacao: 'Ligação',
+  whatsapp: 'WhatsApp',
+  reuniao: 'Reunião',
+  visita: 'Visita',
+  email: 'E-mail',
+  tarefa: 'Tarefa',
 };
 
-/** Atividade agendada vinculada ao negócio (aba "Atividades"). */
-export type Atividade = {
-  id: string;
-  tipo: AtividadeTipo;
-  titulo: string;
-  prioridade: DealPrioridade;
-  data: string; // YYYY-MM-DD
-  /** "Dia todo": sem horário (horaInicio/horaFim ficam vazios). Atividades antigas têm horário. */
-  diaTodo?: boolean;
-  horaInicio: string; // HH:mm — vazio quando diaTodo
-  horaFim: string; // HH:mm — vazio quando diaTodo
-  responsavelId: string;
-  responsavelNome: string;
-  observacoes?: string;
-  concluida: boolean;
+export const TEMPERATURA_LABEL: Record<string, string> = {
+  frio: 'Frio',
+  morno: 'Morno',
+  quente: 'Quente',
+};
+
+export const PERFIL_CLIENTE_LABEL: Record<string, string> = {
+  residencial: 'Residencial',
+  comercial: 'Comercial',
+  industrial: 'Industrial',
+  rural: 'Rural',
+};
+
+export interface Anotacao {
+  id?: string;
+  texto: string;
   criadoEm: string;
-};
+  autor: string;
+}
 
-export type Deal = {
-  id: string;
-  funnelId: FunnelId;
-  stageId: string;
+export interface Atividade {
+  id?: string;
+  tipo: AtividadeTipo;
+  descricao: string;
+  data: string;
+  concluida: boolean;
+}
+
+export interface DocumentoAnexo {
+  id?: string;
+  nome: string;
+  url: string;
+}
+
+export interface Deal {
+  id?: string;
   titulo: string;
+  clienteNome: string;
   valor: number;
-  responsavel: string;
-  createdAt?: string;
-
-  // Relacionamentos
-  organizacaoId?: string;
-  pessoaId?: string;
-
-  // Dados do negócio
-  previsaoFechamento?: string;
-  canalOrigem?: string;
+  estagio: string;
   prioridade?: DealPrioridade;
-  probabilidade?: number;
-  temperatura?: Temperatura;
-  status?: DealStatus;
-
-  // Unidade consumidora
-  distribuidora?: string;
-  contaContrato?: string;
-  numeroUC?: string;
-  classeConsumidora?: string;
-  grupoTarifario?: string;
-  modalidadeTarifaria?: string;
-  fase?: string;
-  tensao?: string;
-  consumoMedio?: number;
-  cargaInstalada?: number;
-  demandaContratada?: number;
-
-  // Projeto solar
-  potenciaSistema?: number;
-  valorProjeto?: number;
-  tipoTelhado?: string;
-  estrutura?: string;
-  inclinacao?: number;
-  orientacao?: string;
-  area?: number;
-  drone?: boolean;
-  trocaTitularidade?: boolean;
-  validadeProposta?: string;
-
-  // Campos adicionais observados no negócio real (perfil, concessionária, NPS)
-  perfilCliente?: PerfilCliente;
-  concessionaria?: string;
-  npsVenda?: number;
-  npsInstalacao?: number;
-  npsPosVenda?: number;
-
-  // Ganho/Perdido
-  motivoPerda?: string;
-  fechadoEm?: string;
-
-  // Cadeia entre funis: card criado automaticamente a partir de outro (Ganho)
-  negocioOrigemId?: string;
-
-  // Importado da SolarZ (script scripts/importar-solarz.mjs)
-  origem?: string;
-  solarzId?: string;
-  solarzFunil?: string;
-  solarzEtapa?: string;
-
-  // Histórico de mudanças de etapa (base para tempo por etapa e conversão nos relatórios)
-  historicoEtapas?: { stageId: string; em: string }[];
-
-  documentos?: DocumentoAnexo[];
-  observacoes?: string;
-};
-
-// --- Organizações & Pessoas (usados no fluxo de criação de Negócio) ---
-
-export type TipoOrganizacao = "PF" | "PJ";
-
-export type Organizacao = {
-  id: string;
-  nome: string;
-  tipo: TipoOrganizacao;
-  cpf?: string;
-  cnpj?: string;
-  razaoSocial?: string;
-  nomeFantasia?: string;
-  telefone?: string;
-  whatsapp?: string;
-  email?: string;
-  site?: string;
-  endereco?: string;
-  numero?: string;
-  bairro?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
-  latitude?: number;
-  longitude?: number;
-  responsavel?: string;
-  canalOrigem?: string;
-  tags: string[];
-  observacoes?: string;
-};
-
-export type Pessoa = {
-  id: string;
-  organizacaoId?: string;
-  nome: string;
-  cpf?: string;
-  rg?: string;
-  dataNascimento?: string;
-  cargo?: string;
-  telefone?: string;
-  whatsapp?: string;
-  email?: string;
-  endereco?: string;
-  numero?: string;
-  bairro?: string;
-  cidade?: string;
-  estado?: string;
-  cep?: string;
-  responsavel?: string;
-  canalOrigem?: string;
-  observacoes?: string;
-};
-
-// --- Leads / Instalações ---
-
-export type LeadTipo = "residencial" | "comercial" | "rural";
-
-export const TIPO_LABEL: Record<LeadTipo, string> = {
-  residencial: "Residencial",
-  comercial: "Comercial",
-  rural: "Rural",
-};
-
-export type StageId =
-  | "novo_lead"
-  | "vistoria"
-  | "documentacao"
-  | "projeto"
-  | "homologacao"
-  | "instalacao"
-  | "comissionamento"
-  | "concluido";
-
-export const STAGES: { id: StageId; label: string }[] = [
-  { id: "novo_lead", label: "Novo lead" },
-  { id: "vistoria", label: "Vistoria" },
-  { id: "documentacao", label: "Documentação" },
-  { id: "projeto", label: "Projeto" },
-  { id: "homologacao", label: "Homologação" },
-  { id: "instalacao", label: "Instalação" },
-  { id: "comissionamento", label: "Comissionamento" },
-  { id: "concluido", label: "Concluído" },
-];
-
-export type Lead = {
-  id: string;
-  cliente: string;
-  local: string;
-  tipo: LeadTipo;
-  stage: StageId;
-  potenciaKwp?: number;
-  valor: number;
-  responsavel: string;
-  tags: string[];
-  /** Quando o lead foi criado (ISO), usado pra ordenar a lista. */
+  temperatura?: string;
+  perfilCliente?: string;
   criadoEm?: string;
-};
+}
+// ==========================================
+// TIPOS E RÓTULOS DE DOCUMENTOS DO CRM
+// ==========================================
 
-// --- Clientes (Cadastro) ---
+export type DocumentoTipo = 
+  | 'rg_cpf' 
+  | 'cnh' 
+  | 'comprovante_residencia' 
+  | 'fatura_energia' 
+  | 'cnpj' 
+  | 'contrato_social' 
+  | 'procuracao' 
+  | 'outros';
 
-export type TipoPessoa = "PF" | "PJ";
-
-export const TIPO_PESSOA_LABEL: Record<TipoPessoa, string> = {
-  PF: "Pessoa Física",
-  PJ: "Pessoa Jurídica",
-};
-
-export type ClienteStatus = "novo" | "em_negociacao" | "cliente_ativo" | "inativo";
-
-export const STATUS_LABEL: Record<ClienteStatus, string> = {
-  novo: "Novo",
-  em_negociacao: "Em negociação",
-  cliente_ativo: "Cliente ativo",
-  inativo: "Inativo",
-};
-
-export const CLIENTE_STATUS_STYLE: Record<ClienteStatus, string> = {
-  novo: "bg-panel-bg text-text-gray",
-  em_negociacao: "bg-badge-blue-bg text-badge-blue-text",
-  cliente_ativo: "bg-badge-green-bg text-badge-green-text",
-  inativo: "bg-panel-bg text-text-faint",
-};
-
-export type Temperatura = "frio" | "morno" | "quente";
-
-export const TEMPERATURA_LABEL: Record<Temperatura, string> = {
-  frio: "Frio",
-  morno: "Morno",
-  quente: "Quente",
-};
-
-export type Cliente = {
-  id: string;
-  codigo: string;
-  createdAt: string;
-
-  // Dados básicos
-  tipoPessoa: TipoPessoa;
-  nome: string;
-  nomeFantasia?: string;
-  razaoSocial?: string;
-  cpf?: string;
-  cnpj?: string;
-  rg?: string;
-  inscricaoEstadual?: string;
-  dataNascimento?: string;
-  estadoCivil?: string;
-  profissao?: string;
-  empresa?: string;
-  cargo?: string;
-
-  // Contatos
-  telefone: string;
-  telefoneSecundario?: string;
-  whatsapp: string;
-  email: string;
-  emailSecundario?: string;
-  site?: string;
-
-  // Endereço
-  cep?: string;
-  endereco?: string;
-  numero?: string;
-  complemento?: string;
-  bairro?: string;
-  cidade: string;
-  estado: string;
-  referencia?: string;
-
-  // Informações comerciais
-  origem?: string;
-  canal?: string;
-  responsavel: string;
-  score?: number;
-  temperatura: Temperatura;
-  status: ClienteStatus;
-  tags: string[];
-  observacoes?: string;
-
-  // Dados energéticos
-  distribuidora?: string;
-  unidadeConsumidora?: string;
-  classeConsumidora?: string;
-  grupoTarifario?: string;
-  consumoMedio?: number;
-  tipoLigacao?: string;
-
-  // Dados financeiros
-  formaPagamento?: string;
-  condicaoPagamento?: string;
+export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
+  rg_cpf: 'RG / CPF',
+  cnh: 'CNH',
+  comprovante_residencia: 'Comprovante de Residência',
+  fatura_energia: 'Fatura de Energia',
+  cnpj: 'Cartão CNPJ',
+  contrato_social: 'Contrato Social',
+  procuracao: 'Procuração',
+  outros: 'Outros Documentos',
 };
