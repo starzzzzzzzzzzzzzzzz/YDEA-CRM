@@ -4,22 +4,21 @@ import {
   getDocs, 
   doc, 
   getDoc, 
-  updateDate, // ou updateDoc conforme padrão do seu projeto
   updateDoc,
   query, 
   where 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config'; // Ajuste o import do db conforme o seu projeto
+import { db } from '@/lib/firebase/config';
 import { PropostaSolar } from '../types';
 
 const COLLECTION_NAME = 'propostas_solares';
 
 // Salvar nova proposta
-Firestore: export async function criarProposta(proposta: Omit<PropostaSolar, 'id'>) {
+export async function criarProposta(proposta: Omit<PropostaSolar, 'id'>) {
   try {
     const docRef = await addDoc(collection(db, COLLECTION_NAME), {
       ...proposta,
-      criadoEm: new Date().toISOString(),
+      criadoEm: proposta.criadoEm || new Date().toISOString(),
     });
     return { success: true, id: docRef.id };
   } catch (error) {
@@ -43,21 +42,11 @@ export async function buscarPropostaPorId(id: string): Promise<PropostaSolar | n
   }
 }
 
-// Listar propostas de um Deal específico do CRM
-export async function listarPropostasPorDeal(idDeal: string): Promise<PropostaSolar[]> {
-  try {
-    const q = query(collection(db, COLLECTION_NAME), where('idDeal', '==', idDeal));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PropostaSolar));
-  } catch (error) {
-    console.error('Erro ao listar propostas do deal:', error);
-    return [];
-  }
-}
+// Buscar propostas vinculadas a um Deal específico do CRM
 export async function buscarPropostasPorDeal(idDeal: string): Promise<PropostaSolar[]> {
   try {
     const q = query(
-      collection(db, 'propostas_solares'),
+      collection(db, COLLECTION_NAME),
       where('idDeal', '==', idDeal)
     );
     const querySnapshot = await getDocs(q);
