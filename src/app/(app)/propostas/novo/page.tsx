@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { calcularPropostaSolar } from '@/lib/proposal-calculations';
-import { criarProposta } from '@/lib/firebase/propostas';
+
+import { calcularPropostaSolarAvancada } from '@/lib/proposal-calculations';import { criarProposta } from '@/lib/firebase/propostas';
 import Step1Dados from '@/components/propostas/Step1Dados';
 import Step2Dimensionamento from '@/components/propostas/Step2Dimensionamento';
 import Step3DetalhesKit from '@/components/propostas/Step3DetalhesKit';

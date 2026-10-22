@@ -115,3 +115,18 @@ export function calcularPropostaSolarAvancada(input: InputDimensionamentoAvancad
     detalhesItens
   };
 }
+// Adicione no final do src/lib/proposal-calculations.ts:
+
+export function calcularPropostaSolar(input: any): any {
+  return calcularPropostaSolarAvancada({
+    tipoFase: input.tipoFase || 'monofasico',
+    consumoMensal: input.consumoMensal || 0,
+    irradiancia: input.irradiancia || 5.0,
+    taxaDesempenho: input.taxaDesempenho || 0.75,
+    potenciaModuloW: input.potenciaModuloW || 550,
+    areaModuloM2: input.areaModuloM2 || 2.58,
+    valorKitMaterial: input.valorKitMaterial || 0,
+    itensComplementares: input.itensComplementares || [],
+    percentualComissao: input.percentualComissao || 0.03
+  });
+}
