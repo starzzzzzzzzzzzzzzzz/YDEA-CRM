@@ -54,3 +54,19 @@ export async function listarPropostasPorDeal(idDeal: string): Promise<PropostaSo
     return [];
   }
 }
+export async function buscarPropostasPorDeal(idDeal: string): Promise<PropostaSolar[]> {
+  try {
+    const q = query(
+      collection(db, 'propostas_solares'),
+      where('idDeal', '==', idDeal)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as PropostaSolar[];
+  } catch (error) {
+    console.error('Erro ao buscar propostas do deal:', error);
+    return [];
+  }
+}
