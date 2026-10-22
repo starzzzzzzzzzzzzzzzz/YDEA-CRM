@@ -1,0 +1,113 @@
+--- a/scripts/importar-solarz.mjs	2026-10-09 18:38:59.951851611 +0000
++++ b/scripts/importar-solarz.mjs	2026-10-10 12:16:27.836512013 +0000
+@@ -40,6 +40,9 @@
+ const BASE = (process.env.SOLARZ_BASE_URL || "https://api.crm.solarz.com.br/api").replace(/\/$/, "");
+ const TOKEN = process.env.SOLARZ_TOKEN;
+ const PAGINA = 100;
++// A SolarZ limita a velocidade das consultas: pausa entre páginas (ajustável) e espera quando ela pede.
++const PAUSA_MS = Number(process.env.SOLARZ_PAUSA_MS || 1000);
++const TENTATIVAS = 7;
+ 
+ // ---------- utilitários ----------
+ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+@@ -81,18 +84,22 @@
+ async function solarz(caminho, params = {}) {
+   const url = new URL(BASE + caminho);
+   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
++  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+     let res;
+     try {
+       res = await fetch(url, { headers: { authorization: TOKEN, accept: "application/json" } });
+     } catch (e) {
+-      if (tentativa === 3) throw new Error(`Sem conexão com ${url.origin}${url.pathname}: ${e.message}`);
++      if (tentativa === TENTATIVAS) throw new Error(`Sem conexão com ${url.origin}${url.pathname}: ${e.message}`);
+       await dormir(1000 * tentativa);
+       continue;
+     }
+     if (res.ok) return res.json();
+-    if ((res.status === 429 || res.status >= 500) && tentativa < 3) {
+-      await dormir(1500 * tentativa);
++    if ((res.status === 429 || res.status >= 500) && tentativa < TENTATIVAS) {
++      // 429 = "muitas consultas". Respeita o tempo que a SolarZ pedir; senão espera mais a cada tentativa.
++      const pedido = Number(res.headers.get("retry-after"));
++      const espera = pedido > 0 ? pedido * 1000 : Math.min(2000 * 2 ** (tentativa - 1), 60000);
++      process.stdout.write(`\n   ⏳ A SolarZ pediu para ir mais devagar (HTTP ${res.status}). Aguardando ${Math.round(espera / 1000)}s...\n`);
++      await dormir(espera);
+       continue;
+     }
+     const corpo = (await res.text()).slice(0, 200);
+@@ -102,15 +109,17 @@
+   }
+ }
+ 
+-async function todasAsPaginas(caminho, extra = {}) {
++/** Lê página por página. `parar(itens)` permite encerrar cedo quando já temos o que precisamos. */
++async function todasAsPaginas(caminho, { tamanho = PAGINA, parar } = {}) {
+   const itens = [];
+   for (let page = 0; ; page++) {
+-    const r = await solarz(caminho, { page, size: PAGINA, ...extra });
++    const r = await solarz(caminho, { page, size: tamanho });
+     const lote = Array.isArray(r) ? r : r.content ?? [];
+     itens.push(...lote);
+     process.stdout.write(`\r   ${caminho}: ${itens.length} lidos`);
++    if (parar && parar(itens)) break;
+     if (Array.isArray(r) || r.last || lote.length === 0) break;
+-    await dormir(150);
++    await dormir(PAUSA_MS);
+   }
+   process.stdout.write("\n");
+   return itens;
+@@ -352,9 +361,15 @@
+ 
+   // 1) negócios
+   console.log("📥 Lendo da SolarZ...");
+-  let negocios = await todasAsPaginas("/v2/open-api/deal");
++  const aberto = (n) => txt(n.status).toUpperCase() === "OPEN";
++  const limitado = LIMITE !== Infinity;
++  let negocios = await todasAsPaginas("/v2/open-api/deal", {
++    // Com --limite, pede só o necessário e para assim que juntar a quantidade pedida.
++    tamanho: limitado && !SO_ABERTOS ? Math.min(PAGINA, LIMITE) : PAGINA,
++    parar: limitado ? (itens) => (SO_ABERTOS ? itens.filter(aberto).length : itens.length) >= LIMITE : undefined,
++  });
+   const total = negocios.length;
+-  if (SO_ABERTOS) negocios = negocios.filter((n) => txt(n.status).toUpperCase() === "OPEN");
++  if (SO_ABERTOS) negocios = negocios.filter(aberto);
+   negocios = negocios.slice(0, LIMITE);
+ 
+   // 2) apoio: funis, pessoas, organizações, usuários
+@@ -367,16 +382,21 @@
+       console.warn(`⚠️  Não consegui ler o funil ${id}: ${e.message}`);
+     }
+   }
+-  const tentar = async (caminho) => {
++  // Lê as listas de pessoas/organizações só até achar quem os negócios usam (evita ler tudo à toa).
++  const precisa = (campo) => new Set(negocios.map((n) => n[campo]).filter(Boolean));
++  const tentar = async (caminho, ids) => {
++    if (ids && ids.size === 0) return [];
+     try {
+-      return await todasAsPaginas(caminho);
++      return await todasAsPaginas(caminho, {
++        parar: ids ? (itens) => [...ids].every((id) => itens.some((x) => x.id === id)) : undefined,
++      });
+     } catch (e) {
+       console.warn(`\n⚠️  ${e.message}`);
+       return [];
+     }
+   };
+-  const pessoas = new Map((await tentar("/v2/open-api/client/persons")).map((p) => [p.id, p]));
+-  const orgs = new Map((await tentar("/v2/open-api/client/organizations")).map((o) => [o.id, o]));
++  const pessoas = new Map((await tentar("/v2/open-api/client/persons", precisa("personId"))).map((p) => [p.id, p]));
++  const orgs = new Map((await tentar("/v2/open-api/client/organizations", precisa("organizationId"))).map((o) => [o.id, o]));
+   const usuariosSolarz = new Map((await tentar("/v2/open-api/users")).map((u) => [u.id, u]));
+ 
+   // nossos usuários (para casar o responsável pelo e-mail)
+@@ -513,7 +533,7 @@
+   // 5) relatório (sem nenhum dado pessoal)
+   const linhas = (m) => [...m].map(([k, q]) => `     - ${k}: ${q} negócio(s)`).join("\n");
+   console.log("\n==================== RELATÓRIO ====================");
+-  console.log(`Negócios na SolarZ: ${stats.lidos}${SO_ABERTOS ? " (filtro: só abertos)" : ""}${LIMITE < Infinity ? ` (limite ${LIMITE})` : ""}`);
++  console.log(`Negócios lidos da SolarZ: ${stats.lidos}${SO_ABERTOS ? " (filtro: só abertos)" : ""}${LIMITE < Infinity ? ` (limite ${LIMITE})` : ""}`);
+   console.log(`Prontos para importar: ${stats.prontos}`);
+   console.log(`Status encontrados: ${[...statusVistos].map(([k, q]) => `${k}=${q}`).join(", ")}`);
+   console.log(`Pessoas ligadas: ${pessoasUsadas.size} | Organizações ligadas: ${orgsUsadas.size} | Negócios sem pessoa/organização: ${stats.semPessoa}`);

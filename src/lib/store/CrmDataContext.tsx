@@ -333,6 +333,12 @@ export function CrmDataProvider({
       negocioOrigemId,
       historicoEtapas,
       previsaoFechamento,
+      // Marcas da importação da SolarZ não podem ir para os cards novos
+      // (senão eles seriam tratados como importados e apagados pelo --desfazer).
+      origem,
+      solarzId,
+      solarzFunil,
+      solarzEtapa,
       ...dados
     } = deal;
     /* eslint-enable @typescript-eslint/no-unused-vars */

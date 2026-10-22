@@ -218,6 +218,12 @@ export type Deal = {
   // Cadeia entre funis: card criado automaticamente a partir de outro (Ganho)
   negocioOrigemId?: string;
 
+  // Importado da SolarZ (script scripts/importar-solarz.mjs)
+  origem?: string;
+  solarzId?: string;
+  solarzFunil?: string;
+  solarzEtapa?: string;
+
   // Histórico de mudanças de etapa (base para tempo por etapa e conversão nos relatórios)
   historicoEtapas?: { stageId: string; em: string }[];
 

@@ -169,6 +169,13 @@ export default function DealDetailPanel({
       return;
     }
     const jaEstavaGanho = deal!.status === "ganho";
+    // Cards importados da SolarZ já têm os cards dos outros funis: pergunta antes de criar o próximo.
+    const criarSeguintes =
+      deal!.origem === "solarz"
+        ? window.confirm(
+            "Este card foi importado da SolarZ.\n\nCriar automaticamente o(s) card(s) do próximo funil?\n\nOK = criar  |  Cancelar = só marcar como ganho"
+          )
+        : true;
     updateDeal(deal!.id, {
       status,
       fechadoEm: new Date().toISOString(),
@@ -177,7 +184,7 @@ export default function DealDetailPanel({
     setMotivoPerdaAberto(false);
     setMotivoPerda("");
 
-    if (status === "ganho" && !jaEstavaGanho) {
+    if (status === "ganho" && !jaEstavaGanho && criarSeguintes) {
       try {
         const r = await criarNegociosSeguintes({ ...deal!, status: "ganho" });
         if (r.criados.length > 0) {
