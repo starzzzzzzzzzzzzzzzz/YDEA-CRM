@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { calcularPropostaSolarAvancada } from '@/lib/proposal-calculations';import { criarProposta } from '@/lib/firebase/propostas';
+import { calcularPropostaSolarAvancada } from '@/lib/proposal-calculations';
+import { createProposta } from '@/lib/firebase/propostas';
 import Step1Dados from '@/components/propostas/Step1Dados';
 import Step2Dimensionamento from '@/components/propostas/Step2Dimensionamento';
 import Step3DetalhesKit from '@/components/propostas/Step3DetalhesKit';
@@ -38,7 +39,8 @@ export default function NovaPropostaPage() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const calculos = calcularPropostaSolar({
+      // Corrigido para usar a função importada corretamente
+      const calculos = calcularPropostaSolarAvancada({
         consumoMensal: formData.consumoMensal,
         tipoFase: formData.tipoFase,
         irradiancia: formData.irradiancia,
@@ -73,7 +75,8 @@ export default function NovaPropostaPage() {
         criadoEm: new Date().toISOString(),
       };
 
-      const res = await criarProposta(novaProposta);
+      // Corrigido para chamar createProposta e tratar a resposta corretamente
+      const res = await createProposta(novaProposta);
       if (res.success && res.id) {
         alert('Proposta gerada e salva com sucesso! 🚀');
         router.push(`/propostas/${res.id}`);
