@@ -10,6 +10,7 @@ import {
   Filter,
   Users,
   Calendar,
+  FileText,
   Sparkles,
   Wallet,
   Settings,
@@ -41,6 +42,7 @@ const NAV = [
   { href: "/leads", label: "Leads", icon: Contact, active: true, permissaoId: "menu.leads" },
   { href: "/clientes", label: "Clientes", icon: BookUser, active: true, permissaoId: "menu.clientes" },
   { href: "/funil", label: "Funil", icon: Filter, active: true, permissaoId: "menu.funil" },
+  { href: "/propostas", label: "Propostas", icon: FileText, active: true, permissaoId: "menu.propostas" },
   { href: "/usuarios", label: "Equipe", icon: Users, active: true, permissaoId: "menu.usuarios" },
   { href: "#", label: "Atividades", icon: Calendar, active: false, permissaoId: "" },
   { href: "#", label: "IA", icon: Sparkles, active: false, permissaoId: "" },
@@ -52,6 +54,7 @@ const TITLES: Record<string, string> = {
   "/leads": "Leads",
   "/clientes": "Clientes",
   "/funil": "Funil",
+  "/propostas": "Propostas",
   "/usuarios": "Equipe",
 };
 

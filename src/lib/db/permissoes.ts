@@ -7,6 +7,7 @@ export const PERMISSOES: Permissao[] = [
   { id: "menu.funil", nome: "Ver Funil" },
   { id: "menu.usuarios", nome: "Ver Usuários" },
   { id: "menu.atividades", nome: "Ver Atividades" },
+  { id: "menu.propostas", nome: "Ver Propostas" },
   { id: "funil.comercial", nome: "Ver funil Comercial" },
   { id: "funil.engenharia", nome: "Ver funil Engenharia" },
   { id: "funil.pos_acompanhamento", nome: "Ver funil Pós-venda: Acompanhamento" },
@@ -36,9 +37,9 @@ function linhas(cargoId: CargoId, permissaoIds: string[]): CargoPermissao[] {
 }
 
 export const CARGO_PERMISSOES: CargoPermissao[] = [
-  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.usuarios", "menu.atividades", ...ALL_FUNIS]),
-  ...linhas("vendedor", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.atividades", "funil.comercial"]),
-  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.atividades", "funil.engenharia"]),
+  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.usuarios", "menu.atividades", "menu.propostas", ...ALL_FUNIS]),
+  ...linhas("vendedor", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.atividades", "menu.propostas", "funil.comercial"]),
+  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.atividades", "menu.propostas", "funil.engenharia"]),
   ...linhas("financeiro", ["menu.dashboard", "menu.clientes", "menu.atividades"]),
   ...linhas("instalacao", ["menu.dashboard", "menu.clientes", "menu.atividades"]),
   ...linhas("pos_venda", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.atividades", ...POS_VENDA_FUNIS]),

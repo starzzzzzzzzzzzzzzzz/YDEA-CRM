@@ -6,9 +6,15 @@ import { Usuario } from "@/lib/types";
  * Quando existir mais de uma unidade operando de verdade, isso migra pra uma
  * coleção `unidades` no Firestore (igual foi feito com `usuarios`).
  */
-export type Unidade = { id: string; nome: string };
+export type Unidade = { id: string; nome: string; /** Endereço da filial de origem, usado como "Endereço base" nas propostas. */ endereco?: string };
 
-export const UNIDADES: Unidade[] = [{ id: "ydea-energia-solar", nome: "Ydea Energia Solar" }];
+export const UNIDADES: Unidade[] = [
+  {
+    id: "ydea-energia-solar",
+    nome: "Ydea Energia Solar",
+    endereco: "Rua Cosme Luiz, 235 - 59360-000 - Parelhas - Rio Grande do Norte",
+  },
+];
 
 export const UNIDADE_PADRAO_ID = UNIDADES[0].id;
 

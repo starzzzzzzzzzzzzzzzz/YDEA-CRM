@@ -192,3 +192,51 @@ body {
 .animate-spin-slow {
   animation: spin 0.7s linear infinite;
 }
+
+/* --- Documentos do gerador de propostas (A4) -------------------------------- */
+.doc-pagina {
+  position: relative;
+  width: 210mm;
+  height: 296mm;
+  padding: 14mm 16mm;
+  margin: 0 auto 10px;
+  background: #ffffff;
+  color: #1a1a1a;
+  box-sizing: border-box;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  break-after: page;
+  page-break-after: always;
+  font-family: inherit;
+}
+.doc-pagina:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+/* Cópia usada só na impressão: some da tela e, ao imprimir, vira a única coisa da página. */
+.doc-print-root {
+  display: none;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  body > *:not(.doc-print-root) {
+    display: none !important;
+  }
+  .doc-print-root {
+    display: block;
+  }
+  .doc-print-root .doc-pagina {
+    margin: 0;
+    box-shadow: none;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

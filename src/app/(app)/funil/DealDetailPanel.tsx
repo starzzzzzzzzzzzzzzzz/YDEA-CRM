@@ -27,8 +27,6 @@ import {
   Users,
   MapPin,
   ListChecks,
-  ExternalLink,
-  Sun,
 } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
@@ -43,7 +41,6 @@ import {
   DealPrioridade,
   Deal,
   DocumentoAnexo,
-  PropostaSolar,
 } from "@/lib/types";
 import { formatBRL } from "@/lib/masks";
 import RichTextEditor from "@/components/ui/RichTextEditor";
@@ -56,7 +53,6 @@ import { useAtividades } from "@/lib/store/AtividadesContext";
 import { quandoTexto } from "@/lib/atividades";
 import { fetchDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
-import { buscarPropostasPorDeal } from "@/lib/firebase/propostas";
 import DocumentUploadGrid from "./DocumentUploadGrid";
 
 function diasDesde(dateStr?: string) {
@@ -113,20 +109,23 @@ export default function DealDetailPanel({
 }: {
   dealId: string;
   onClose: () => void;
+  /** Fecha o painel e abre o formulário de "Novo negócio" pré-preenchido com estes dados. */
   onDuplicate?: (deal: Deal) => void;
+  /** Avisa o Kanban quando a situação de "tem atividade pendente" deste negócio muda,
+   * pro card atualizar o ícone na hora, sem esperar um refetch. */
   onAtividadesStatusChange?: (dealId: string, pendente: boolean) => void;
 }) {
-  const router = useRouter();
   const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal, criarNegociosSeguintes } =
     useCrmData();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const router = useRouter();
 
   const deal = deals.find((d) => d.id === dealId);
 
   const [notaValue, setNotaValue] = useState("");
   const [salvandoNota, setSalvandoNota] = useState(false);
-  const [abaPrincipal, setAbaPrincipal] = useState<"linha_tempo" | "anotacoes" | "atividades" | "propostas">(
+  const [abaPrincipal, setAbaPrincipal] = useState<"linha_tempo" | "anotacoes" | "atividades">(
     "linha_tempo"
   );
   const [showInfoCliente, setShowInfoCliente] = useState(true);
@@ -141,11 +140,11 @@ export default function DealDetailPanel({
   const [notaImagens, setNotaImagens] = useState<string[]>([]);
   const [notaMencoes, setNotaMencoes] = useState<{ id: string; nome: string }[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
-  const [propostas, setPropostas] = useState<PropostaSolar[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
   const [usuarios, setUsuarios] = useState<(UsuarioDoc & { id: string })[]>([]);
   const [novaAtividadeAberta, setNovaAtividadeAberta] = useState(false);
   const { substituirDoNegocio } = useAtividades();
+  // Id do negócio cuja lista de atividades já chegou do Firestore.
   const [atividadesProntasDe, setAtividadesProntasDe] = useState<string | null>(null);
 
   useEffect(() => {
@@ -159,13 +158,18 @@ export default function DealDetailPanel({
       .catch((err) => console.error(err));
     fetchDocumentos(dealId).then(setDocumentos).catch((err) => console.error(err));
     fetchAllUsuarios().then(setUsuarios).catch((err) => console.error(err));
-    buscarPropostasPorDeal(dealId).then(setPropostas).catch((err) => console.error(err));
   }, [dealId]);
 
+  // Mantém o ícone do card no Kanban em sincronia — sem isso, marcar/criar uma
+  // atividade aqui só refletiria lá depois de um refetch (ex.: trocar de funil).
   useEffect(() => {
     onAtividadesStatusChange?.(dealId, atividades.some((a) => !a.concluida));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atividades, dealId]);
 
+  // Mantém a tela Atividades e os lembretes em sincronia com o que acontece aqui.
+  // Só depois que a lista deste negócio chegou — senão a lista vazia do início apagaria
+  // as pendências dele por um instante.
   useEffect(() => {
     if (atividadesProntasDe === dealId) substituirDoNegocio(dealId, atividades);
   }, [atividades, atividadesProntasDe, dealId, substituirDoNegocio]);
@@ -178,17 +182,13 @@ export default function DealDetailPanel({
 
   if (!deal) return null;
 
-  function handleGerarProposta() {
-    const nomeCliente = encodeURIComponent(deal?.clienteNome || deal?.titulo || "");
-    router.push(`/propostas/novo?dealId=${deal?.id}&clienteNome=${nomeCliente}`);
-  }
-
   async function handleStatus(status: "ganho" | "perdido") {
     if (status === "perdido" && !motivoPerdaAberto) {
       setMotivoPerdaAberto(true);
       return;
     }
     const jaEstavaGanho = deal!.status === "ganho";
+    // Cards importados da SolarZ já têm os cards dos outros funis: pergunta antes de criar o próximo.
     const criarSeguintes =
       deal!.origem === "solarz"
         ? window.confirm(
@@ -209,10 +209,25 @@ export default function DealDetailPanel({
         if (r.criados.length > 0) {
           const lista = r.criados.map((c) => `${c.funilNome} (${c.etapaNome})`).join(" e ");
           showToast(`Ganho 🎉 Cards criados: ${lista}`, "success");
+          if (r.documentosComErro > 0) {
+            showToast(`${r.documentosComErro} documento(s) não foram copiados para o novo card`, "error");
+          }
+          if (r.avisoFalhou) {
+            showToast("Os cards foram criados, mas o aviso para a equipe falhou", "error");
+          }
+          if (r.destinosComErro > 0) {
+            showToast("Um dos cards seguintes não foi criado — avise o suporte", "error");
+          }
+          return;
+        }
+        if (r.destinosComErro > 0) {
+          showToast("Marcado como ganho, mas não consegui criar o card do próximo funil", "error");
           return;
         }
       } catch (err) {
         console.error("Erro ao criar os cards seguintes:", err);
+        showToast("Marcado como ganho, mas não consegui criar o card do próximo funil", "error");
+        return;
       }
     }
 
@@ -231,6 +246,7 @@ export default function DealDetailPanel({
     if ((!notaValue.trim() && notaImagens.length === 0) || !user) return;
     setSalvandoNota(true);
     try {
+      // Só vale quem ainda está escrito no texto (a pessoa pode ter apagado o @nome) e não é a própria autora.
       const idsMarcados = notaMencoes
         .filter((m) => notaValue.includes(`@${m.nome}`) && m.id !== user.id)
         .map((m) => m.id);
@@ -251,6 +267,9 @@ export default function DealDetailPanel({
           autorId: user.id,
           autorNome: user.nome,
           texto: notaValue.trim(),
+        }).catch((err) => {
+          console.error("Erro ao notificar os colaboradores marcados:", err);
+          showToast("Anotação salva, mas a notificação não chegou para quem foi marcado", "error");
         });
       }
       setNotaValue("");
@@ -459,7 +478,7 @@ export default function DealDetailPanel({
             </div>
 
             <button
-              onClick={handleGerarProposta}
+              onClick={() => router.push(`/propostas/nova?dealId=${deal.id}`)}
               className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-3.5 py-1.5 hover:bg-brand-strong transition-colors"
             >
               <FileOutput size={14} />
@@ -596,37 +615,6 @@ export default function DealDetailPanel({
                 )}
               </SidebarCard>
 
-              {/* Card Resumo de Propostas Solares */}
-              <SidebarCard
-                title="Propostas Solares"
-                action={
-                  <button onClick={handleGerarProposta} title="Nova Proposta">
-                    <Plus size={14} className="text-brand-strong hover:scale-110 transition-transform" />
-                  </button>
-                }
-              >
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[12.5px]">
-                    <span className="text-text-faint">Geradas:</span>
-                    <span className="font-semibold text-text-dark">{propostas.length}</span>
-                  </div>
-                  {propostas.length > 0 && (
-                    <div className="flex justify-between items-center text-[12.5px]">
-                      <span className="text-text-faint">Valor mais recente:</span>
-                      <span className="font-bold text-green-600">
-                        {formatBRL(propostas[0].calculos.valorTotalProposta)}
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setAbaPrincipal("propostas")}
-                    className="w-full mt-2 py-1.5 px-2 bg-brand-soft text-brand-strong rounded-lg text-xs font-semibold hover:bg-brand transition-colors text-center block"
-                  >
-                    Ver todas as propostas
-                  </button>
-                </div>
-              </SidebarCard>
-
               <SidebarCard title="Financiamento">
                 <button
                   onClick={() => showToast("Financiamento ainda não implementado", "info")}
@@ -673,7 +661,7 @@ export default function DealDetailPanel({
         {/* Main */}
         <main className="flex-1 overflow-y-auto px-6 py-5">
           <div className="flex items-center gap-5 border-b border-border-soft mb-4">
-            {(["linha_tempo", "anotacoes", "atividades", "propostas"] as const).map((tab) => (
+            {(["linha_tempo", "anotacoes", "atividades"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setAbaPrincipal(tab)}
@@ -687,9 +675,7 @@ export default function DealDetailPanel({
                   ? "Linha do tempo"
                   : tab === "anotacoes"
                   ? `Anotações (${anotacoes.length})`
-                  : tab === "atividades"
-                  ? `Atividades (${atividades.length})`
-                  : `Propostas (${propostas.length})`}
+                  : `Atividades (${atividades.length})`}
               </button>
             ))}
           </div>
@@ -777,87 +763,6 @@ export default function DealDetailPanel({
               setOpen={setNovaAtividadeAberta}
             />
           )}
-
-          {abaPrincipal === "propostas" && (
-            <div className="space-y-6 max-w-4xl">
-              <div className="flex justify-between items-center">
-                <h3 className="text-base font-bold text-text-dark flex items-center gap-2">
-                  <Sun size={18} className="text-amber-500" />
-                  Propostas Solares do Negócio
-                </h3>
-                <button
-                  onClick={handleGerarProposta}
-                  className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-xs px-3 py-2 hover:bg-brand-strong transition-colors"
-                >
-                  <Plus size={14} /> Nova Proposta
-                </button>
-              </div>
-
-              {propostas.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border py-12 text-center space-y-3">
-                  <FileOutput size={36} className="mx-auto text-text-faint" />
-                  <p className="text-sm font-medium text-text-dark">Nenhuma proposta gerada para este negócio</p>
-                  <button
-                    onClick={handleGerarProposta}
-                    className="text-xs text-brand-strong font-semibold hover:underline"
-                  >
-                    Clique aqui para abrir o assistente de dimensionamento
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {propostas.map((prop) => (
-                    <div
-                      key={prop.id}
-                      className="rounded-xl border border-border bg-card-bg p-4 shadow-sm hover:border-brand transition-colors flex flex-col justify-between space-y-3"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                            {prop.status}
-                          </span>
-                          <h4 className="font-bold text-sm text-text-dark mt-1">{prop.nomeProjeto}</h4>
-                        </div>
-                        <span className="text-xs text-text-faint">
-                          {new Date(prop.criadoEm).toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 bg-panel-bg p-2.5 rounded-lg text-center text-xs">
-                        <div>
-                          <span className="text-text-faint block">Potência</span>
-                          <span className="font-bold text-text-dark">{prop.calculos.kwpReal} kWp</span>
-                        </div>
-                        <div>
-                          <span className="text-text-faint block">Módulos</span>
-                          <span className="font-bold text-text-dark">{prop.calculos.qtdModulos} un</span>
-                        </div>
-                        <div>
-                          <span className="text-text-faint block">Geração</span>
-                          <span className="font-bold text-text-dark">{prop.calculos.geracaoEspecifica} kWh</span>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center pt-2 border-t border-border-soft">
-                        <div>
-                          <span className="text-[11px] text-text-faint block">Investimento Total</span>
-                          <span className="text-base font-extrabold text-green-600">
-                            {formatBRL(prop.calculos.valorTotalProposta)}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => router.push(`/propostas/${prop.id}`)}
-                          className="flex items-center gap-1 text-xs font-semibold text-brand-strong hover:underline"
-                        >
-                          Ver Detalhes <ExternalLink size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </main>
       </div>
 
@@ -936,6 +841,7 @@ function AtividadesTab({
         diaTodo,
         horaInicio: diaTodo ? "" : horaInicio,
         horaFim: diaTodo ? "" : horaFim,
+        // Sempre o UID da pessoa (o select usa o e-mail só como valor da opção).
         responsavelId: resp?.id ?? currentUser?.id ?? "",
         responsavelNome: resp?.nome ?? currentUser?.nome ?? "—",
         observacoes: observacoes.trim() || undefined,
@@ -958,6 +864,8 @@ function AtividadesTab({
   }
 
   async function handleToggle(a: Atividade) {
+    // Concluiu a última atividade pendente? Abre o formulário pra agendar a próxima —
+    // negócio sem próxima atividade é negócio que esfria.
     const ficouSemPendente = !a.concluida && !atividades.some((x) => x.id !== a.id && !x.concluida);
     setAtividades((prev) => prev.map((x) => (x.id === a.id ? { ...x, concluida: !x.concluida } : x)));
     try {
@@ -1212,6 +1120,7 @@ function TimelineTab({
   const [filtro, setFiltro] = useState<(typeof TIMELINE_FILTROS)[number]["id"]>("todas");
 
   const entradas: TimelineEntry[] = useMemo(() => {
+    // Negócios novos guardam a hora exata no histórico de etapas; os antigos só têm a data.
     const criado: TimelineEntry = {
       kind: "criado",
       ts: deal.historicoEtapas?.[0]?.em ?? `${deal.createdAt}T00:00:00`,

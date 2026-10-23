@@ -3,4 +3,4 @@
  * do package.json, que é interna/semver de dependências). Atualizar manualmente
  * a cada entrega relevante — ver CHANGELOG.md.
  */
-export const APP_VERSION = "1.08.00";
+export const APP_VERSION = "1.09.00";

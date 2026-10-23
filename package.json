@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsc --outDir .test-build --module commonjs --moduleResolution node --target es2020 --skipLibCheck --strict --ignoreConfig src/lib/propostas/proposal-calculations.ts src/lib/propostas/proposal-text.ts src/lib/propostas/validacao.ts src/lib/propostas/types.ts src/lib/propostas/proposal.test.ts && node --test .test-build/proposal.test.js",
     "create-admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {

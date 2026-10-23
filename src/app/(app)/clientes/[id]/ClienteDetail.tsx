@@ -95,10 +95,13 @@ export default function ClienteDetail({ cliente }: { cliente: Cliente }) {
               <Mail size={15} />
               Email
             </button>
-            <button className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors">
+            <Link
+              href={`/propostas/nova?clienteId=${cliente.id}`}
+              className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
+            >
               <FileText size={15} />
               Nova proposta
-            </button>
+            </Link>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   X,
@@ -206,9 +207,10 @@ export default function NewDealModal({
   /** Quando informado, o formulário abre pré-preenchido com estes dados — usado por "Duplicar negócio". */
   initialDeal?: Deal;
   onClose: () => void;
-  onCreate: (deal: Omit<Deal, "id" | "createdAt">) => void | Promise<void>;
+  onCreate: (deal: Omit<Deal, "id" | "createdAt">) => void | Deal | Promise<void | Deal>;
 }) {
   const { showToast } = useToast();
+  const router = useRouter();
   const { organizacoes, pessoas, addOrganizacao, addPessoa, currentUser } = useCrmData();
   const [usuarios, setUsuarios] = useState<UsuarioDoc[]>([]);
 
@@ -414,12 +416,15 @@ export default function NewDealModal({
 
     try {
       const dealData = buildDeal();
-      await onCreate(dealData);
+      const criado = await onCreate(dealData);
       localStorage.removeItem(draftKey(funnel.id));
 
       showToast(
-        generateProposal ? "Negócio criado — gerando proposta..." : "Negócio criado com sucesso"
+        generateProposal ? "Negócio criado — abrindo o gerador de proposta..." : "Negócio criado com sucesso"
       );
+      if (generateProposal && criado && typeof criado === "object" && "id" in criado) {
+        router.push(`/propostas/nova?dealId=${criado.id}`);
+      }
     } catch (err) {
       console.error("Erro ao criar negócio:", err);
       if (err instanceof Error && err.name === "AnexosFalharam") {

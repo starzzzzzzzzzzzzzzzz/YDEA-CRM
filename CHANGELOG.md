@@ -4,6 +4,24 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v20 — Gerador de propostas (proposta comercial, contrato e OS)
+
+**Novo menu "Propostas"** (permissão `menu.propostas`: admin, vendedor e projetista) com a lista de propostas e o wizard de criação, aberto por três caminhos: botão **Gerar proposta** do negócio, **Criar + Gerar Proposta** no novo negócio e **Nova proposta** na ficha do cliente. Negócio e cliente já preenchem o que existe (cliente, UC, fase, consumo, consultor, endereço da filial).
+
+**Wizard:** Dados → Dimensionamento → Detalhes → Pós-dimensionamento → Proposta. Cada "Prosseguir" valida a etapa e salva rascunho; "Finalizar" marca como finalizada. O número da proposta é sequencial (contador no Firestore, em transação).
+
+**Regras de cálculo** (todas em `src/lib/propostas/proposal-calculations.ts`, com testes — `npm test`): geração específica, kWp necessário (com custo de disponibilidade por fase), módulos, potência real, área, gross-up de 13,58% nos complementares, instalação R$ 80/módulo, comissão de 3% opcional, preço por kWp e projeção de 25 anos. Conferidas com os números das telas do sistema anterior.
+
+**Travas contra os erros anteriores:** campo vazio sai como "-" nos documentos; validade nasce hoje + 7 dias; geração mensal do contrato vem do dimensionamento (campo somente leitura); irradiação em kWh/m²·dia e CO₂ em toneladas; o contrato não imprime com cláusulas 2.1.1/2.1.2 ainda com marcadores do modelo.
+
+**Documentos** (A4, impressos via "Imprimir / Salvar PDF"): Proposta (8 págs.), Contrato (7 págs.) e OS (2 págs.), todos calculados da mesma fonte.
+
+**Pendências conhecidas:** kit gerado pelo sistema (precisa de catálogo de distribuidores); texto das cláusulas gerais do contrato é provisório (`CONTRATO_TEXTO_REVISADO = false` bloqueia a impressão); CNPJ/representante da contratada em `CONTRATADA` em `src/lib/propostas/constants.ts`; premissas da projeção (degradação 0,5%/ano, reajuste 5%/ano, fator de CO₂) em `PREMISSAS`; páginas institucionais ("Quem somos", "Cases") não incluídas.
+
+**Firestore:** novas regras para `propostas` e `contadores` (publicar `firestore.rules`).
+
+---
+
 ## v19 — Tela Atividades, lembretes no sino e atividade "dia todo"
 
 **Tela Atividades (menu lateral, antes desativado):** reúne as atividades pendentes dos negócios abertos em três listas — **Hoje**, **Atrasadas** e **Próximas** —, com filtro "Só as minhas" (padrão) ou "Todos os responsáveis". Dá para concluir direto na lista ou abrir o negócio. Nova permissão `menu.atividades`, liberada para todos os cargos.

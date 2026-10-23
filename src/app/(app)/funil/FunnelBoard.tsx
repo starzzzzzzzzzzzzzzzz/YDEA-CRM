@@ -306,9 +306,9 @@ export default function FunnelBoard() {
     updateDeal(String(active.id), { stageId: newStage });
   }
 
-  async function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">) {
+  async function handleCreate(newDeal: Omit<Deal, "id" | "createdAt">): Promise<Deal> {
     try {
-      await addDeal(newDeal);
+      return await addDeal(newDeal);
     } finally {
       // Fecha mesmo se algum anexo falhar: o negócio já foi criado (evita duplicar ao clicar de novo).
       setModalOpen(false);
