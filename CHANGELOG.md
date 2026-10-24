@@ -20,7 +20,9 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 **Tarifas automáticas (ANEEL):** na etapa Dimensionamento, ao informar a concessionária (ex.: "COSERN - Neoenergia Cosern") e o perfil (B1/B2/B3), o CRM busca TE, TUSD e Fio B vigentes nos dados abertos da ANEEL (rota `/api/tarifas`, com cache de 12 h) e preenche os campos; há botão para rebuscar e os campos continuam editáveis. Se a ANEEL não responder ou não achar o Fio B, o campo fica para preenchimento manual (nada é inventado).
 
-**Catálogo de equipamentos:** nova tela `/propostas/catalogo` para cadastrar módulos e inversores (colando linhas de planilha). Na etapa Detalhes, escolher o modelo preenche marca, potência, dimensões, garantias, tensão, fase e valor; também dá para salvar no catálogo o que foi digitado à mão.
+**Fase → tensão:** ao trocar a fase da rede, a tensão é escolhida automaticamente (monofásico V220, bifásico V220, trifásico V380) e os inversores do kit acompanham; a lista de tensões é limitada às possíveis para a fase. Padrões editáveis em `TENSAO_PADRAO_POR_FASE` (`src/lib/propostas/constants.ts`).
+
+**Catálogo de equipamentos:** nova tela `/propostas/catalogo` para cadastrar módulos e inversores (colando linhas de planilha). Na etapa Detalhes, o campo **Escolher do catálogo** (módulo e cada inversor) abre a lista completa ao clicar, com busca por marca, modelo ou potência; escolher preenche marca, potência, dimensões, garantias, tensão, fase e valor; também dá para salvar no catálogo o que foi digitado à mão. Com o catálogo vazio, a tela do catálogo oferece começar com os 2 equipamentos do sistema anterior (AE650 e WEG 5 kW).
 
 **Firestore:** novas regras para `propostas`, `contadores`, `catalogo_modulos` e `catalogo_inversores` (publicar `firestore.rules`).
 

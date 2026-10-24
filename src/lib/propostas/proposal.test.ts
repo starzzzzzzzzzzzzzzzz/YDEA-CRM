@@ -26,6 +26,7 @@ import {
   valorPorExtenso,
 } from "./proposal-text";
 import { validarEtapa } from "./validacao";
+import { TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE } from "./constants";
 import { interpretarTarifas, siglaDaConcessionaria } from "./aneel";
 import { importarInversores, importarModulos, numeroBR } from "./catalogo-import";
 import type { PropostaDados } from "./types";
@@ -420,5 +421,13 @@ describe("importação do catálogo", () => {
     assert.equal(r.itens[0].fase, "monofasico");
     assert.equal(r.itens[0].valorUnitario, 2798.05);
     assert.equal(r.itens[0].potenciaMaximaVA, 5500);
+  });
+});
+
+describe("tensão por fase", () => {
+  it("a tensão padrão de cada fase é uma tensão permitida para ela", () => {
+    for (const fase of ["monofasico", "bifasico", "trifasico"] as const) {
+      assert.ok(TENSOES_POR_FASE[fase].includes(TENSAO_PADRAO_POR_FASE[fase]));
+    }
   });
 });

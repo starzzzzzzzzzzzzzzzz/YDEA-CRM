@@ -14,7 +14,7 @@ import {
   whParaKwh,
 } from "@/lib/propostas/proposal-calculations";
 import { formatarDataBR, formatarNumero } from "@/lib/propostas/proposal-text";
-import { CONCESSIONARIAS_SUGERIDAS, TENSOES_REDE, TIPOS_ESTRUTURA } from "@/lib/propostas/constants";
+import { CONCESSIONARIAS_SUGERIDAS, TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE, TIPOS_ESTRUTURA } from "@/lib/propostas/constants";
 import { FASE_LABEL, type FaseRede } from "@/lib/propostas/types";
 import { EtapaProps, NumeroInput, Secao } from "../ui";
 
@@ -26,6 +26,14 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
   const ultimaBusca = useRef("");
   const gerEsp = geracaoEspecifica(dados.irradiacaoWhM2Dia, dados.taxaDesempenhoPct);
   const kwp = kwpNecessario(dados.consumoMedioKwh, dados.fase, gerEsp);
+
+  /** Trocar a fase já escolhe a tensão correspondente (e acompanha os inversores do kit). */
+  function trocarFase(fase: FaseRede) {
+    const tensao = TENSAO_PADRAO_POR_FASE[fase];
+    set("fase", fase);
+    set("tensao", tensao);
+    set("inversores", dados.inversores.map((i) => ({ ...i, fase, tensaoSaida: tensao })));
+  }
 
   async function buscarTarifas(automatico: boolean) {
     if (!dados.concessionaria.trim()) {
@@ -84,7 +92,7 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Fase da rede do cliente" required>
-            <select className={inputClass} value={dados.fase} onChange={(e) => set("fase", e.target.value as FaseRede)}>
+            <select className={inputClass} value={dados.fase} onChange={(e) => trocarFase(e.target.value as FaseRede)}>
               {(Object.keys(FASE_LABEL) as FaseRede[]).map((f) => (
                 <option key={f} value={f}>
                   {FASE_LABEL[f]}
@@ -94,7 +102,7 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
           </Field>
           <Field label="Tensão da rede do cliente">
             <select className={inputClass} value={dados.tensao} onChange={(e) => set("tensao", e.target.value)}>
-              {TENSOES_REDE.map((t) => (
+              {(TENSOES_POR_FASE[dados.fase].includes(dados.tensao) ? TENSOES_POR_FASE[dados.fase] : [dados.tensao, ...TENSOES_POR_FASE[dados.fase]]).map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>

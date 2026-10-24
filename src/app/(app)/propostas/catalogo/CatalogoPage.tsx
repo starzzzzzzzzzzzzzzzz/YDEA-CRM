@@ -57,6 +57,21 @@ export default function CatalogoPage() {
     }
   }
 
+  /** Os dois equipamentos que apareciam nas telas do sistema anterior (AE650 e WEG 5 kW), como ponto de partida. */
+  async function carregarExemplos() {
+    setOcupado(true);
+    try {
+      await importarModulosCatalogo([{ marca: "AE SOLAR", modelo: "AE650ME-132BD", potenciaW: 650, larguraMm: 1302, comprimentoMm: 2384 }]);
+      await importarInversoresCatalogo([{ marca: "WEG", modelo: "SIW200G M050 W1", potenciaKw: 5, tensaoSaida: "V220", fase: "monofasico", potenciaMaximaVA: 5500, valorUnitario: 2798.05 }]);
+      await recarregar();
+      showToast("Equipamentos de exemplo cadastrados");
+    } catch {
+      showToast("Erro ao cadastrar", "error");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function excluir(tipo: "modulos" | "inversores", id: string) {
     if (!window.confirm("Excluir este equipamento do catálogo?")) return;
     try {
@@ -79,6 +94,11 @@ export default function CatalogoPage() {
           Cole as linhas de uma planilha (Excel/Google Sheets) ou separe por ponto e vírgula.
         </p>
         {erro && <p className="text-[12.5px] text-badge-red-text mt-2">Não foi possível carregar o catálogo.</p>}
+        {!carregando && !erro && modulos.length === 0 && inversores.length === 0 && (
+          <button className={`${btn} mt-3`} disabled={ocupado} onClick={carregarExemplos}>
+            Começar com os 2 equipamentos do sistema anterior
+          </button>
+        )}
       </div>
 
       {/* Módulos */}
