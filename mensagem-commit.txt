@@ -1,19 +1,28 @@
-COMMIT MESSAGE SUGERIDA
-========================
+feat(propostas): gerador de propostas com wizard, motor de cálculo, documentos, tarifas ANEEL e catálogo
 
-feat(funil): redesenha DealCard e corrige navegação do painel de detalhes
+Novo menu "Propostas" (permissão menu.propostas) com lista e wizard em 5 etapas
+(Dados, Dimensionamento, Detalhes, Pós-dimensionamento, Proposta), aberto pelo
+botão "Gerar proposta" do negócio, por "Criar + Gerar Proposta" e pela ficha do
+cliente. Cada "Prosseguir" valida e salva rascunho; número sequencial por
+transação no Firestore.
 
-- DealCard: layout redesenhado (título, subtítulo com nome da
-  organização/pessoa em destaque, avatar + valor)
-- Indicador de atividade trocado de bolinha colorida para ícone de
-  calendário (CalendarCheck2 verde / CalendarX2 vermelho), igual ao
-  padrão de referência do CRM
-- Mesmo ícone aplicado também na visão em Lista (tabela), mantendo
-  consistência visual entre Grade e Lista
-- Abrir um negócio agora registra um passo no histórico do navegador;
-  fechar o painel (botão X ou "voltar" do navegador/celular) retorna
-  exatamente para o funil como estava — mesmo funil selecionado,
-  filtro de responsável e modo de visão (Grade/Lista) — em vez de
-  resetar para o início
+- Motor de cálculo (src/lib/propostas/proposal-calculations.ts): geração
+  específica, kWp, módulos, potência real, área, gross-up de 13,58% nos
+  complementares, instalação R$ 80/módulo, comissão de 3% opcional, preço por
+  kWp e projeção de 25 anos. Conferido com os números das telas anteriores
+- Documentos A4 imprimíveis: Proposta (8 págs.), Contrato (7) e OS (2), todos
+  calculados da mesma fonte
+- Travas: campo vazio vira "-", validade nasce hoje + 7 dias, geração mensal
+  do contrato vem do dimensionamento (somente leitura), irradiação em
+  kWh/m²·dia e CO2 em toneladas; contrato não imprime com cláusulas 2.1.1/2.1.2
+  ainda com marcadores
+- Tarifas TE/TUSD/Fio B buscadas na ANEEL (rota /api/tarifas, cache 12 h)
+- Catálogo de módulos e inversores (/propostas/catalogo) com importação por
+  planilha e preenchimento automático na etapa Detalhes
+- Testes da lógica (npm test, 54 casos), CHANGELOG v20 e versão 1.09.00
 
-Arquivo alterado: src/app/(app)/funil/FunnelBoard.tsx
+Pendências: kit gerado pelo sistema; texto jurídico do contrato (provisório,
+CONTRATO_TEXTO_REVISADO=false); CNPJ da contratada; premissas da projeção.
+
+Publicar firestore.rules (novas coleções: propostas, contadores,
+catalogo_modulos, catalogo_inversores).
