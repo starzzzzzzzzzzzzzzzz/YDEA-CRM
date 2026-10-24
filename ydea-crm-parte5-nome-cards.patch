@@ -1,0 +1,77 @@
+--- a/CHANGELOG.md	2026-10-03 17:11:03.000000000 +0000
++++ b/CHANGELOG.md	2026-10-03 17:20:05.425346635 +0000
+@@ -4,6 +4,17 @@
+ 
+ ---
+ 
++## v17 — Nome automático nos cards criados pela cadeia
++
++Os cards criados automaticamente já nascem com o nome do funil na frente, para dar pra bater o olho e saber onde cada um está:
++- Engenharia: `[ENGENHARIA] Nome do cliente`
++- Pós-Acompanhamento: `[PÓS] Nome do cliente`
++- Pós-NPS: `[PÓS NPS] Nome do cliente`
++
++Se o nome já tiver um prefixo de outro funil, ele é trocado (nunca fica `[PÓS] [ENGENHARIA] ...`). O prefixo de cada funil fica em `PROXIMOS_APOS_GANHO` (`src/lib/funnels.ts`, campo `prefixoTitulo`). A grafia do nome do cliente é mantida como foi digitada.
++
++---
++
+ ## v16 — Cadeia automática de funis, documentos que acompanham o card e aviso por função
+ 
+ **Ao marcar um negócio como Ganho, o sistema cria sozinho o(s) card(s) do próximo funil:**
+--- a/src/lib/funnels.ts	2026-10-03 17:10:26.000000000 +0000
++++ b/src/lib/funnels.ts	2026-10-03 17:20:05.424344350 +0000
+@@ -74,6 +74,8 @@
+ export type DestinoCadeia = {
+   funnelId: FunnelId;
+   stageId: string;
++  /** Prefixo do nome do card criado, ex.: "ENGENHARIA" → "[ENGENHARIA] Nome do cliente". */
++  prefixoTitulo: string;
+   /** Se informado, quem tem essa função na equipe é avisado no sino quando o card é criado. */
+   notificarFuncao?: FuncaoId;
+ };
+@@ -86,9 +88,23 @@
+  * Para estender (Gestão Energética, Ampliação) ou avisar outra função, basta editar aqui.
+  */
+ export const PROXIMOS_APOS_GANHO: Partial<Record<FunnelId, DestinoCadeia[]>> = {
+-  comercial: [{ funnelId: "engenharia", stageId: "onboard", notificarFuncao: "engenharia" }],
++  comercial: [{
++      funnelId: "engenharia",
++      stageId: "onboard",
++      prefixoTitulo: "ENGENHARIA",
++      notificarFuncao: "engenharia",
++    },],
+   engenharia: [
+-    { funnelId: "pos_acompanhamento", stageId: "on_board" },
+-    { funnelId: "pos_nps", stageId: "nps_comercial" },
++    { funnelId: "pos_acompanhamento", stageId: "on_board", prefixoTitulo: "PÓS" },
++    { funnelId: "pos_nps", stageId: "nps_comercial", prefixoTitulo: "PÓS NPS" },
+   ],
+ };
++
++/**
++ * Monta o nome do card da cadeia: troca o prefixo anterior pelo do novo funil.
++ * "[ENGENHARIA] Kauê Silva" + "PÓS" → "[PÓS] Kauê Silva".
++ */
++export function tituloComPrefixo(titulo: string, prefixo: string): string {
++  const base = titulo.replace(/^(\s*\[[^\]]*\]\s*)+/, "").trim() || titulo.trim();
++  return `[${prefixo}] ${base}`;
++}
+--- a/src/lib/store/CrmDataContext.tsx	2026-10-03 17:11:03.000000000 +0000
++++ b/src/lib/store/CrmDataContext.tsx	2026-10-03 17:20:05.424814170 +0000
+@@ -11,7 +11,7 @@
+   Temperatura,
+   Usuario,
+ } from "@/lib/types";
+-import { FUNNELS, PROXIMOS_APOS_GANHO } from "@/lib/funnels";
++import { FUNNELS, PROXIMOS_APOS_GANHO, tituloComPrefixo } from "@/lib/funnels";
+ import { fetchDocumentos, copiarDocumentos } from "@/lib/firebase/documentos";
+ import { fetchAllUsuarios } from "@/lib/firebase/firestore";
+ import { criarNotificacoesNovoNegocio } from "@/lib/firebase/notificacoes";
+@@ -302,6 +302,7 @@
+       try {
+         novo = await addDeal({
+           ...dados,
++          titulo: tituloComPrefixo(dados.titulo, destino.prefixoTitulo),
+           funnelId: destino.funnelId,
+           stageId: destino.stageId,
+           status: "aberto",

@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Field, inputClass, inputErrorClass } from "@/components/ui/Field";
+import { useToast } from "@/components/ui/Toast";
+import { buscarTarifasAneel } from "@/lib/propostas/tarifas-client";
 import {
   CUSTO_DISPONIBILIDADE_KWH,
   IRRADIACAO_PADRAO_WH_M2_DIA,
@@ -9,15 +13,53 @@ import {
   kwpNecessario,
   whParaKwh,
 } from "@/lib/propostas/proposal-calculations";
-import { formatarNumero } from "@/lib/propostas/proposal-text";
+import { formatarDataBR, formatarNumero } from "@/lib/propostas/proposal-text";
 import { CONCESSIONARIAS_SUGERIDAS, TENSOES_REDE, TIPOS_ESTRUTURA } from "@/lib/propostas/constants";
 import { FASE_LABEL, type FaseRede } from "@/lib/propostas/types";
 import { EtapaProps, NumeroInput, Secao } from "../ui";
 
 export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps) {
   const cls = (campo: string) => `${inputClass} ${erros[campo] ? inputErrorClass : ""}`;
+  const { showToast } = useToast();
+  const [buscando, setBuscando] = useState(false);
+  const [origemTarifas, setOrigemTarifas] = useState("");
+  const ultimaBusca = useRef("");
   const gerEsp = geracaoEspecifica(dados.irradiacaoWhM2Dia, dados.taxaDesempenhoPct);
   const kwp = kwpNecessario(dados.consumoMedioKwh, dados.fase, gerEsp);
+
+  async function buscarTarifas(automatico: boolean) {
+    if (!dados.concessionaria.trim()) {
+      if (!automatico) showToast("Informe a concessionária primeiro", "error");
+      return;
+    }
+    ultimaBusca.current = `${dados.concessionaria}|${dados.perfilConcessionaria}`;
+    setBuscando(true);
+    const r = await buscarTarifasAneel(dados.concessionaria, dados.perfilConcessionaria);
+    setBuscando(false);
+    if (!r.ok) {
+      setOrigemTarifas(automatico ? "" : r.erro);
+      if (!automatico) showToast(r.erro, "error");
+      else setOrigemTarifas(`Não foi possível buscar na ANEEL (${r.erro}). Informe manualmente.`);
+      return;
+    }
+    const t = r.tarifas;
+    set("tarifaTE", t.te);
+    set("tarifaTUSD", t.tusd);
+    if (t.fioB !== null) set("tarifaFioB", t.fioB);
+    setOrigemTarifas(
+      `Tarifas da ANEEL (${t.distribuidora} · ${t.subgrupo}), vigentes desde ${formatarDataBR(t.vigenciaInicio)}, sem impostos.${t.avisos.length ? " " + t.avisos.join(" ") : ""}`
+    );
+  }
+
+  // Preenche sozinho quando a concessionária/perfil é definida e as tarifas ainda estão vazias.
+  useEffect(() => {
+    const chave = `${dados.concessionaria}|${dados.perfilConcessionaria}`;
+    if (dados.concessionaria.trim().length < 3 || ultimaBusca.current === chave) return;
+    if (dados.tarifaTE || dados.tarifaTUSD || dados.tarifaFioB) return;
+    const timer = setTimeout(() => buscarTarifas(true), 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dados.concessionaria, dados.perfilConcessionaria]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -29,6 +71,13 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
               <option key={c} value={c} />
             ))}
           </datalist>
+        </Field>
+        <Field label="Perfil da concessionária" required hint="Define as tarifas buscadas na ANEEL.">
+          <select className={inputClass} value={dados.perfilConcessionaria} onChange={(e) => set("perfilConcessionaria", e.target.value as "B1" | "B2" | "B3")}>
+            <option value="B1">B1 - Residencial</option>
+            <option value="B2">B2 - Rural</option>
+            <option value="B3">B3 - Comercial</option>
+          </select>
         </Field>
         <Field label="Código da unidade consumidora (UC)">
           <input className={inputClass} placeholder="Ex.: A1B2C345" value={dados.codigoUC} onChange={(e) => set("codigoUC", e.target.value)} />
@@ -59,6 +108,18 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
         >
           <NumeroInput value={dados.consumoMedioKwh} onChange={(n) => set("consumoMedioKwh", n)} sufixo="kWh" className={erros.consumoMedioKwh ? inputErrorClass : ""} />
         </Field>
+        <div className="flex flex-wrap items-center gap-3 -mb-1">
+          <button
+            type="button"
+            disabled={buscando}
+            onClick={() => buscarTarifas(false)}
+            className="flex items-center gap-1.5 rounded-lg border border-border text-text-gray font-semibold text-[13px] px-3 py-1.5 hover:bg-panel-bg transition-colors disabled:opacity-60"
+          >
+            <RefreshCw size={13} className={buscando ? "animate-spin" : ""} />
+            {buscando ? "Buscando na ANEEL..." : "Buscar tarifas na ANEEL"}
+          </button>
+          {origemTarifas && <span className="text-[12px] text-text-faint">{origemTarifas}</span>}
+        </div>
         <div className="grid grid-cols-3 gap-4">
           <Field label="Tarifa TE" required error={erros.tarifaTE}>
             <NumeroInput value={dados.tarifaTE} onChange={(n) => set("tarifaTE", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaTE ? inputErrorClass : ""} />

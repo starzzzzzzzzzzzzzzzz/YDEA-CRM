@@ -1,0 +1,908 @@
+--- a/CHANGELOG.md	2026-10-04 00:17:07.000000000 +0000
++++ b/CHANGELOG.md	2026-10-04 00:33:41.890570609 +0000
+@@ -4,6 +4,24 @@
+ 
+ ---
+ 
++## v19 — Tela Atividades, lembretes no sino e atividade "dia todo"
++
++**Tela Atividades (menu lateral, antes desativado):** reúne as atividades pendentes dos negócios abertos em três listas — **Hoje**, **Atrasadas** e **Próximas** —, com filtro "Só as minhas" (padrão) ou "Todos os responsáveis". Dá para concluir direto na lista ou abrir o negócio. Nova permissão `menu.atividades`, liberada para todos os cargos.
++
++**Atividade "Dia todo":** o formulário da aba Atividades do negócio agora vem com "Dia todo (sem horário)" marcado por padrão; desmarcando, aparecem os campos de início e fim. Atividades antigas, com horário, continuam como estavam. Atividade de dia todo só fica **atrasada quando o dia termina**; com horário, fica atrasada depois do horário de fim.
++
++**Lembretes no sino:** com o CRM aberto, o sistema confere a cada minuto as atividades de quem está logado e avisa **uma vez** quando uma atividade atrasa ("Atividade atrasada em ...") e **uma vez por dia** quando há atividades para hoje ("Você tem N atividades para hoje"). O aviso tem id fixo no Firestore, então não duplica, mesmo com o CRM aberto em dois lugares. **Limitação:** só avisa quando alguém está com o CRM aberto (abrindo depois, o aviso chega na hora). Lembrete por e-mail ou WhatsApp com o CRM fechado exige um agendador no servidor e ficou para uma próxima etapa.
++
++**Próxima atividade:** ao concluir a última atividade pendente de um negócio (na aba do negócio), o formulário de nova atividade abre sozinho com um aviso; na tela Atividades aparece o botão "Agendar a próxima".
++
++**Ajustes:**
++- O responsável de uma atividade agora é sempre gravado pelo id do usuário (antes, ao escolher outra pessoa na lista, ficava o e-mail). Atividades antigas continuam funcionando.
++- A linha do tempo mostra a hora real de criação do negócio (nos negócios novos), em vez de "00:00".
++
++**Nota técnica:** a tela lê as atividades negócio por negócio (uma leitura por negócio aberto) — não precisa de índice nem de regra nova no Firestore. Se a quantidade de negócios abertos crescer muito, o caminho é migrar para uma consulta de grupo (aí sim com regra e índice).
++
++---
++
+ ## v18 — Aviso (sino + e-mail) para a função de cada funil
+ 
+ Cada funil passa a ter uma função responsável, conforme o que a pessoa é na equipe (campo "Função", na tela Equipe):
+--- a/src/app/(app)/atividades/AtividadesView.tsx	1970-01-01 00:00:00.000000000 +0000
++++ b/src/app/(app)/atividades/AtividadesView.tsx	2026-10-04 00:33:41.862115398 +0000
+@@ -0,0 +1,200 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { useRouter } from "next/navigation";
++import { Check, ListChecks, Mail, MapPin, MessageCircle, Phone, Users, X } from "lucide-react";
++import { Atividade, AtividadeTipo, ATIVIDADE_TIPO_LABEL } from "@/lib/types";
++import { useAuth } from "@/lib/store/AuthContext";
++import { useCrmData } from "@/lib/store/CrmDataContext";
++import { useAtividades } from "@/lib/store/AtividadesContext";
++import { useToast } from "@/components/ui/Toast";
++import { AtividadeDoNegocio, ehDoUsuario, ehParaHoje, estaAtrasada, quandoTexto, dataLocalISO } from "@/lib/atividades";
++
++const ICONE: Record<AtividadeTipo, typeof Phone> = {
++  ligacao: Phone,
++  whatsapp: MessageCircle,
++  email: Mail,
++  reuniao: Users,
++  visita: MapPin,
++  tarefa: ListChecks,
++};
++
++type Aba = "hoje" | "atrasadas" | "proximas";
++
++const ABAS: { id: Aba; label: string; vazio: string }[] = [
++  { id: "hoje", label: "Hoje", vazio: "Nenhuma atividade para hoje." },
++  { id: "atrasadas", label: "Atrasadas", vazio: "Nada atrasado. Bom trabalho." },
++  { id: "proximas", label: "Próximas", vazio: "Nenhuma atividade agendada para os próximos dias." },
++];
++
++function ordenar(a: Atividade, b: Atividade) {
++  return (
++    a.data.localeCompare(b.data) || (a.horaInicio || "").localeCompare(b.horaInicio || "") || a.titulo.localeCompare(b.titulo)
++  );
++}
++
++export default function AtividadesView() {
++  const router = useRouter();
++  const { user } = useAuth();
++  const { deals } = useCrmData();
++  const { itens, carregando, marcarConcluida } = useAtividades();
++  const { showToast } = useToast();
++
++  const [aba, setAba] = useState<Aba>("hoje");
++  const [somenteMinhas, setSomenteMinhas] = useState(true);
++  const [semProxima, setSemProxima] = useState<{ dealId: string; titulo: string } | null>(null);
++
++  const dealsPorId = useMemo(() => new Map(deals.map((d) => [d.id, d])), [deals]);
++
++  const grupos = useMemo(() => {
++    const agora = new Date();
++    const hoje = dataLocalISO(agora);
++    const visiveis = itens.filter((i) => !somenteMinhas || !user || ehDoUsuario(i.atividade, user));
++    const atrasadas: AtividadeDoNegocio[] = [];
++    const deHoje: AtividadeDoNegocio[] = [];
++    const proximas: AtividadeDoNegocio[] = [];
++    for (const i of visiveis) {
++      if (estaAtrasada(i.atividade, agora)) atrasadas.push(i);
++      else if (ehParaHoje(i.atividade, agora)) deHoje.push(i);
++      else if (i.atividade.data > hoje) proximas.push(i);
++    }
++    const ord = (l: AtividadeDoNegocio[]) => l.sort((x, y) => ordenar(x.atividade, y.atividade));
++    return { hoje: ord(deHoje), atrasadas: ord(atrasadas), proximas: ord(proximas) };
++  }, [itens, somenteMinhas, user]);
++
++  async function concluir(item: AtividadeDoNegocio) {
++    const ficaSemProxima = !itens.some((i) => i.dealId === item.dealId && i.atividade.id !== item.atividade.id);
++    try {
++      await marcarConcluida(item.dealId, item.atividade.id);
++      showToast("Atividade concluída");
++      if (ficaSemProxima) {
++        setSemProxima({ dealId: item.dealId, titulo: dealsPorId.get(item.dealId)?.titulo ?? "O negócio" });
++      }
++    } catch {
++      showToast("Não foi possível concluir a atividade", "error");
++    }
++  }
++
++  const lista = grupos[aba];
++  const abaAtual = ABAS.find((a) => a.id === aba)!;
++
++  return (
++    <div>
++      <div className="mb-6">
++        <h1 className="font-display font-bold text-xl text-text-dark mb-1">Atividades</h1>
++        <p className="text-[13px] text-text-gray">
++          Tudo o que está agendado nos negócios abertos — conclua aqui ou abra o negócio.
++        </p>
++      </div>
++
++      <div className="flex items-center gap-2 flex-wrap mb-4">
++        {ABAS.map((a) => {
++          const ativa = a.id === aba;
++          const qtd = grupos[a.id].length;
++          return (
++            <button
++              key={a.id}
++              type="button"
++              onClick={() => setAba(a.id)}
++              className={`rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${
++                ativa ? "bg-brand text-text-dark" : "bg-panel-bg text-text-gray hover:text-text-dark"
++              }`}
++            >
++              {a.label}
++              <span className={`ml-1.5 ${a.id === "atrasadas" && qtd > 0 && !ativa ? "text-badge-red-text" : ""}`}>
++                {qtd}
++              </span>
++            </button>
++          );
++        })}
++        <span className="flex-1" />
++        <select
++          value={somenteMinhas ? "minhas" : "todas"}
++          onChange={(e) => setSomenteMinhas(e.target.value === "minhas")}
++          className="rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
++        >
++          <option value="minhas">Só as minhas</option>
++          <option value="todas">Todos os responsáveis</option>
++        </select>
++      </div>
++
++      {semProxima && (
++        <div className="flex items-center gap-3 rounded-lg border border-border bg-card-bg px-4 py-3 mb-4 text-[13px] text-text-dark">
++          <p className="flex-1">
++            <span className="font-semibold">{semProxima.titulo}</span> ficou sem próxima atividade. Agende a próxima para
++            o negócio não esfriar.
++          </p>
++          <button
++            type="button"
++            onClick={() => router.push(`/funil?negocio=${semProxima.dealId}`)}
++            className="rounded-lg bg-brand text-text-dark font-semibold text-[13px] px-3.5 py-2 hover:bg-brand-strong transition-colors"
++          >
++            Agendar a próxima
++          </button>
++          <button
++            type="button"
++            onClick={() => setSemProxima(null)}
++            aria-label="Dispensar"
++            className="text-text-faint hover:text-text-dark"
++          >
++            <X size={16} />
++          </button>
++        </div>
++      )}
++
++      {carregando ? (
++        <div className="space-y-2">
++          {[0, 1, 2].map((n) => (
++            <div key={n} className="h-14 rounded-lg bg-panel-bg animate-pulse" />
++          ))}
++        </div>
++      ) : lista.length === 0 ? (
++        <div className="rounded-lg border border-dashed border-border py-12 text-center text-[13px] text-text-faint">
++          {abaAtual.vazio}
++        </div>
++      ) : (
++        <div className="space-y-2 max-w-3xl">
++          {lista.map((item) => {
++            const { atividade: a } = item;
++            const deal = dealsPorId.get(item.dealId);
++            const Icone = ICONE[a.tipo];
++            const atrasada = estaAtrasada(a);
++            return (
++              <div
++                key={`${item.dealId}-${a.id}`}
++                className="flex items-start gap-3 rounded-lg border border-border-soft bg-card-bg p-3"
++              >
++                <button
++                  type="button"
++                  onClick={() => concluir(item)}
++                  aria-label="Concluir atividade"
++                  className="h-5 w-5 rounded-full border-2 border-border mt-0.5 shrink-0 flex items-center justify-center text-transparent hover:border-brand hover:text-brand transition-colors"
++                >
++                  <Check size={12} />
++                </button>
++                <Icone size={16} className="text-text-gray mt-0.5 shrink-0" />
++                <div className="min-w-0 flex-1">
++                  <p className="text-[13px] font-medium text-text-dark">
++                    {ATIVIDADE_TIPO_LABEL[a.tipo]} · {a.titulo}
++                  </p>
++                  <button
++                    type="button"
++                    onClick={() => router.push(`/funil?negocio=${item.dealId}`)}
++                    className="text-[12px] text-brand-strong hover:underline text-left"
++                  >
++                    {deal?.titulo ?? "Abrir negócio"}
++                  </button>
++                  <p className={`text-[11.5px] mt-0.5 ${atrasada ? "text-badge-red-text" : "text-text-faint"}`}>
++                    {quandoTexto(a)} · {a.responsavelNome}
++                    {a.prioridade === "alta" ? " · Prioridade alta" : ""}
++                  </p>
++                  {a.observacoes && <p className="text-[12px] text-text-gray mt-1">{a.observacoes}</p>}
++                </div>
++              </div>
++            );
++          })}
++        </div>
++      )}
++    </div>
++  );
++}
+--- a/src/app/(app)/atividades/page.tsx	1970-01-01 00:00:00.000000000 +0000
++++ b/src/app/(app)/atividades/page.tsx	2026-10-04 00:33:41.860524557 +0000
+@@ -0,0 +1,5 @@
++import AtividadesView from "./AtividadesView";
++
++export default function AtividadesPage() {
++  return <AtividadesView />;
++}
+--- a/src/app/(app)/funil/DealDetailPanel.tsx	2026-10-04 00:17:07.000000000 +0000
++++ b/src/app/(app)/funil/DealDetailPanel.tsx	2026-10-04 00:34:14.501058001 +0000
+@@ -48,6 +48,8 @@
+ import { useToast } from "@/components/ui/Toast";
+ import { fetchAnotacoes, addAnotacao } from "@/lib/firebase/anotacoes";
+ import { fetchAtividades, addAtividade, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
++import { useAtividades } from "@/lib/store/AtividadesContext";
++import { quandoTexto } from "@/lib/atividades";
+ import { fetchDocumentos } from "@/lib/firebase/documentos";
+ import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
+ import DocumentUploadGrid from "./DocumentUploadGrid";
+@@ -139,11 +141,19 @@
+   const [documentos, setDocumentos] = useState<DocumentoAnexo[]>([]);
+   const [usuarios, setUsuarios] = useState<(UsuarioDoc & { id: string })[]>([]);
+   const [novaAtividadeAberta, setNovaAtividadeAberta] = useState(false);
++  const { substituirDoNegocio } = useAtividades();
++  // Id do negócio cuja lista de atividades já chegou do Firestore.
++  const [atividadesProntasDe, setAtividadesProntasDe] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     if (!dealId) return;
+     fetchAnotacoes(dealId).then(setAnotacoes).catch((err) => console.error(err));
+-    fetchAtividades(dealId).then(setAtividades).catch((err) => console.error(err));
++    fetchAtividades(dealId)
++      .then((lista) => {
++        setAtividades(lista);
++        setAtividadesProntasDe(dealId);
++      })
++      .catch((err) => console.error(err));
+     fetchDocumentos(dealId).then(setDocumentos).catch((err) => console.error(err));
+     fetchAllUsuarios().then(setUsuarios).catch((err) => console.error(err));
+   }, [dealId]);
+@@ -155,6 +165,13 @@
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [atividades, dealId]);
+ 
++  // Mantém a tela Atividades e os lembretes em sincronia com o que acontece aqui.
++  // Só depois que a lista deste negócio chegou — senão a lista vazia do início apagaria
++  // as pendências dele por um instante.
++  useEffect(() => {
++    if (atividadesProntasDe === dealId) substituirDoNegocio(dealId, atividades);
++  }, [atividades, atividadesProntasDe, dealId, substituirDoNegocio]);
++
+   const funnel = deal ? FUNNELS.find((f) => f.id === deal.funnelId) : undefined;
+   const organizacao = getOrganizacao(deal?.organizacaoId);
+   const pessoa = getPessoa(deal?.pessoaId);
+@@ -781,7 +798,7 @@
+   dealId: string;
+   atividades: Atividade[];
+   setAtividades: (fn: (prev: Atividade[]) => Atividade[]) => void;
+-  usuarios: UsuarioDoc[];
++  usuarios: (UsuarioDoc & { id: string })[];
+   currentUser: { id: string; nome: string } | null;
+   open: boolean;
+   setOpen: (v: boolean) => void;
+@@ -791,6 +808,7 @@
+   const [titulo, setTitulo] = useState("");
+   const [prioridade, setPrioridade] = useState<DealPrioridade>("media");
+   const [data, setData] = useState("");
++  const [diaTodo, setDiaTodo] = useState(true);
+   const [horaInicio, setHoraInicio] = useState("");
+   const [horaFim, setHoraFim] = useState("");
+   const [responsavelId, setResponsavelId] = useState("");
+@@ -802,7 +820,7 @@
+ 
+   async function handleSalvar(e: React.FormEvent) {
+     e.preventDefault();
+-    if (!titulo.trim() || !data || !horaInicio || !horaFim) return;
++    if (!titulo.trim() || !data || (!diaTodo && (!horaInicio || !horaFim))) return;
+     const resp = usuarios.find((u) => u.email === responsavelId);
+     setSalvando(true);
+     try {
+@@ -811,15 +829,18 @@
+         titulo: titulo.trim(),
+         prioridade,
+         data,
+-        horaInicio,
+-        horaFim,
+-        responsavelId: responsavelId || currentUser?.id || "",
++        diaTodo,
++        horaInicio: diaTodo ? "" : horaInicio,
++        horaFim: diaTodo ? "" : horaFim,
++        // Sempre o UID da pessoa (o select usa o e-mail só como valor da opção).
++        responsavelId: resp?.id ?? currentUser?.id ?? "",
+         responsavelNome: resp?.nome ?? currentUser?.nome ?? "—",
+         observacoes: observacoes.trim() || undefined,
+       });
+       setAtividades((prev) => [...prev, nova]);
+       setTitulo("");
+       setData("");
++      setDiaTodo(true);
+       setHoraInicio("");
+       setHoraFim("");
+       setObservacoes("");
+@@ -834,12 +855,19 @@
+   }
+ 
+   async function handleToggle(a: Atividade) {
++    // Concluiu a última atividade pendente? Abre o formulário pra agendar a próxima —
++    // negócio sem próxima atividade é negócio que esfria.
++    const ficouSemPendente = !a.concluida && !atividades.some((x) => x.id !== a.id && !x.concluida);
+     setAtividades((prev) => prev.map((x) => (x.id === a.id ? { ...x, concluida: !x.concluida } : x)));
+     try {
+       await marcarAtividadeConcluida(dealId, a.id, !a.concluida);
+     } catch (err) {
+       console.error(err);
+     }
++    if (ficouSemPendente) {
++      setOpen(true);
++      showToast("Atividade concluída. Agende a próxima para o negócio não ficar parado", "info");
++    }
+   }
+ 
+   return (
+@@ -890,7 +918,7 @@
+               className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+             />
+           </div>
+-          <div className="grid grid-cols-3 gap-3">
++          <div className={`grid gap-3 ${diaTodo ? "grid-cols-1" : "grid-cols-3"}`}>
+             <div>
+               <label className="block text-[11px] font-semibold text-text-gray mb-1">Data</label>
+               <input
+@@ -901,27 +929,40 @@
+                 className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+               />
+             </div>
+-            <div>
+-              <label className="block text-[11px] font-semibold text-text-gray mb-1">Início</label>
+-              <input
+-                type="time"
+-                value={horaInicio}
+-                onChange={(e) => setHoraInicio(e.target.value)}
+-                required
+-                className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+-              />
+-            </div>
+-            <div>
+-              <label className="block text-[11px] font-semibold text-text-gray mb-1">Fim</label>
+-              <input
+-                type="time"
+-                value={horaFim}
+-                onChange={(e) => setHoraFim(e.target.value)}
+-                required
+-                className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
+-              />
+-            </div>
++            {!diaTodo && (
++              <>
++                <div>
++                  <label className="block text-[11px] font-semibold text-text-gray mb-1">Início</label>
++                  <input
++                    type="time"
++                    value={horaInicio}
++                    onChange={(e) => setHoraInicio(e.target.value)}
++                    required
++                    className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
++                  />
++                </div>
++                <div>
++                  <label className="block text-[11px] font-semibold text-text-gray mb-1">Fim</label>
++                  <input
++                    type="time"
++                    value={horaFim}
++                    onChange={(e) => setHoraFim(e.target.value)}
++                    required
++                    className="w-full rounded-lg border border-border bg-panel-bg px-3 py-2 text-[13px] text-text-dark outline-none focus:border-brand"
++                  />
++                </div>
++              </>
++            )}
+           </div>
++          <label className="flex items-center gap-2 text-[12.5px] text-text-gray cursor-pointer select-none">
++            <input
++              type="checkbox"
++              checked={diaTodo}
++              onChange={(e) => setDiaTodo(e.target.checked)}
++              className="h-4 w-4 accent-[var(--brand)]"
++            />
++            Dia todo (sem horário)
++          </label>
+           <div>
+             <label className="block text-[11px] font-semibold text-text-gray mb-1">Responsável</label>
+             <select
+@@ -1023,8 +1064,7 @@
+           {ATIVIDADE_TIPO_LABEL[atividade.tipo]} · {atividade.titulo}
+         </p>
+         <p className="text-[11.5px] text-text-faint mt-0.5">
+-          {new Date(atividade.data + "T00:00:00").toLocaleDateString("pt-BR")} · {atividade.horaInicio}–
+-          {atividade.horaFim} · {atividade.responsavelNome}
++          {quandoTexto(atividade)} · {atividade.responsavelNome}
+         </p>
+         {atividade.observacoes && <p className="text-[12px] text-text-gray mt-1">{atividade.observacoes}</p>}
+       </div>
+@@ -1071,7 +1111,11 @@
+   const [filtro, setFiltro] = useState<(typeof TIMELINE_FILTROS)[number]["id"]>("todas");
+ 
+   const entradas: TimelineEntry[] = useMemo(() => {
+-    const criado: TimelineEntry = { kind: "criado", ts: `${deal.createdAt}T00:00:00` };
++    // Negócios novos guardam a hora exata no histórico de etapas; os antigos só têm a data.
++    const criado: TimelineEntry = {
++      kind: "criado",
++      ts: deal.historicoEtapas?.[0]?.em ?? `${deal.createdAt}T00:00:00`,
++    };
+     const doasAnotacoes: TimelineEntry[] = anotacoes.map((a) => ({
+       kind: "anotacao",
+       ts: a.criadoEm,
+@@ -1085,7 +1129,7 @@
+     return [criado, ...doasAnotacoes, ...dasAtividades].sort(
+       (a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()
+     );
+-  }, [deal.createdAt, anotacoes, atividades]);
++  }, [deal.createdAt, deal.historicoEtapas, anotacoes, atividades]);
+ 
+   const filtradas = entradas.filter((e) => {
+     if (filtro === "todas") return true;
+@@ -1191,8 +1235,7 @@
+                     {ATIVIDADE_TIPO_LABEL[at.tipo]}
+                   </span>
+                   <p className="text-[12.5px] text-text-gray mt-1.5">
+-                    {new Date(at.data + "T00:00:00").toLocaleDateString("pt-BR")} · {at.horaInicio} até{" "}
+-                    {at.horaFim}
++                    {quandoTexto(at)}
+                   </p>
+                   <button
+                     onClick={() => handleToggle(at)}
+--- a/src/app/(app)/layout.tsx	2026-10-04 00:17:07.000000000 +0000
++++ b/src/app/(app)/layout.tsx	2026-10-04 00:32:16.757891032 +0000
+@@ -5,6 +5,7 @@
+ import AppShell from "@/components/AppShell";
+ import { useAuth } from "@/lib/store/AuthContext";
+ import { CrmDataProvider } from "@/lib/store/CrmDataContext";
++import { AtividadesProvider } from "@/lib/store/AtividadesContext";
+ 
+ export default function AppGroupLayout({
+   children,
+@@ -35,7 +36,9 @@
+ 
+   return (
+     <CrmDataProvider currentUser={user}>
+-      <AppShell>{children}</AppShell>
++      <AtividadesProvider>
++        <AppShell>{children}</AppShell>
++      </AtividadesProvider>
+     </CrmDataProvider>
+   );
+ }
+--- a/src/components/AppShell.tsx	2026-10-04 00:17:07.000000000 +0000
++++ b/src/components/AppShell.tsx	2026-10-04 00:32:16.758349444 +0000
+@@ -42,7 +42,7 @@
+   { href: "/clientes", label: "Clientes", icon: BookUser, active: true, permissaoId: "menu.clientes" },
+   { href: "/funil", label: "Funil", icon: Filter, active: true, permissaoId: "menu.funil" },
+   { href: "/usuarios", label: "Equipe", icon: Users, active: true, permissaoId: "menu.usuarios" },
+-  { href: "#", label: "Atividades", icon: Calendar, active: false, permissaoId: "" },
++  { href: "/atividades", label: "Atividades", icon: Calendar, active: true, permissaoId: "menu.atividades" },
+   { href: "#", label: "IA", icon: Sparkles, active: false, permissaoId: "" },
+   { href: "#", label: "Financeiro", icon: Wallet, active: false, permissaoId: "" },
+ ];
+@@ -53,6 +53,7 @@
+   "/clientes": "Clientes",
+   "/funil": "Funil",
+   "/usuarios": "Equipe",
++  "/atividades": "Atividades",
+ };
+ 
+ function pageTitle(pathname: string | null) {
+--- a/src/components/NotificacoesBell.tsx	2026-10-04 00:17:07.000000000 +0000
++++ b/src/components/NotificacoesBell.tsx	2026-10-04 00:32:16.759062990 +0000
+@@ -2,7 +2,7 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { Bell, AtSign, Inbox } from "lucide-react";
++import { Bell, AtSign, Inbox, CalendarClock } from "lucide-react";
+ import { useCrmData } from "@/lib/store/CrmDataContext";
+ import {
+   Notificacao,
+@@ -38,6 +38,11 @@
+   function abrir(n: Notificacao) {
+     if (!n.lida) marcarComoLida(n.id).catch((err) => console.error(err));
+     setAberto(false);
++    // Resumo "atividades para hoje" não é de um negócio: leva pra tela Atividades.
++    if (!n.dealId) {
++      router.push("/atividades");
++      return;
++    }
+     if (window.location.pathname.startsWith("/funil")) {
+       window.dispatchEvent(new CustomEvent("abrir-negocio", { detail: n.dealId }));
+     } else {
+@@ -95,11 +100,23 @@
+                     }`}
+                   >
+                     <div className="h-7 w-7 rounded-full bg-brand-soft text-brand-strong flex items-center justify-center shrink-0 mt-0.5">
+-                      {n.tipo === "novo_negocio" ? <Inbox size={13} /> : <AtSign size={13} />}
++                      {n.tipo === "novo_negocio" ? (
++                        <Inbox size={13} />
++                      ) : n.tipo === "atividade_atrasada" || n.tipo === "atividade_hoje" ? (
++                        <CalendarClock size={13} />
++                      ) : (
++                        <AtSign size={13} />
++                      )}
+                     </div>
+                     <div className="min-w-0 flex-1">
+                       <p className="text-[12.5px] text-text-dark">
+-                        {n.tipo === "novo_negocio" ? (
++                        {n.tipo === "atividade_hoje" ? (
++                          <span className="font-semibold">{n.trecho}</span>
++                        ) : n.tipo === "atividade_atrasada" ? (
++                          <>
++                            Atividade atrasada em <span className="font-semibold">{n.dealTitulo}</span>
++                          </>
++                        ) : n.tipo === "novo_negocio" ? (
+                           <>
+                             Novo negócio na sua área:{" "}
+                             <span className="font-semibold">{n.dealTitulo}</span>
+@@ -111,7 +128,9 @@
+                           </>
+                         )}
+                       </p>
+-                      <p className="text-[12px] text-text-gray line-clamp-2">{n.trecho}</p>
++                      {n.tipo !== "atividade_hoje" && (
++                        <p className="text-[12px] text-text-gray line-clamp-2">{n.trecho}</p>
++                      )}
+                       <p className="text-[11px] text-text-faint mt-0.5">{formatar(n.criadoEm)}</p>
+                     </div>
+                     {!n.lida && <span className="h-2 w-2 rounded-full bg-brand shrink-0 mt-2" />}
+--- a/src/lib/atividades.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/src/lib/atividades.ts	2026-10-04 00:32:16.691892367 +0000
+@@ -0,0 +1,57 @@
++import { Atividade } from "@/lib/types";
++
++/** Atividade + o negócio a que pertence (a atividade vive em deals/{dealId}/atividades). */
++export type AtividadeDoNegocio = { dealId: string; atividade: Atividade };
++
++const p2 = (n: number) => String(n).padStart(2, "0");
++
++/** Data de hoje no fuso do navegador, no formato YYYY-MM-DD (o mesmo do campo `data`). */
++export function dataLocalISO(d: Date = new Date()): string {
++  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
++}
++
++function horaLocal(d: Date): string {
++  return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
++}
++
++/** Atividades antigas têm horário; as novas podem ser "dia todo" (sem horário). */
++export function temHorario(a: Atividade): boolean {
++  return !a.diaTodo && !!(a.horaInicio || a.horaFim);
++}
++
++/**
++ * Atrasada = ainda pendente e:
++ * - o dia já passou; ou
++ * - é hoje, tem horário e o horário de fim (ou de início, se não houver fim) já passou.
++ * Atividade "dia todo" só atrasa quando o dia termina.
++ */
++export function estaAtrasada(a: Atividade, agora: Date = new Date()): boolean {
++  if (a.concluida) return false;
++  const hoje = dataLocalISO(agora);
++  if (a.data < hoje) return true;
++  if (a.data > hoje) return false;
++  if (!temHorario(a)) return false;
++  const fim = a.horaFim || a.horaInicio;
++  return fim < horaLocal(agora);
++}
++
++export function ehParaHoje(a: Atividade, agora: Date = new Date()): boolean {
++  return !a.concluida && a.data === dataLocalISO(agora);
++}
++
++/** "03/10/2026 · Dia todo" ou "03/10/2026 · 09:00–10:00". */
++export function quandoTexto(a: Atividade): string {
++  const dia = new Date(a.data + "T00:00:00").toLocaleDateString("pt-BR");
++  if (!temHorario(a)) return `${dia} · Dia todo`;
++  const horas = a.horaInicio && a.horaFim ? `${a.horaInicio}–${a.horaFim}` : a.horaInicio || a.horaFim;
++  return `${dia} · ${horas}`;
++}
++
++/**
++ * A atividade é de quem está logado? O campo `responsavelId` já foi gravado como UID (padrão)
++ * e, em atividades antigas atribuídas a outra pessoa, como e-mail — por isso aceita os dois,
++ * e cai no nome como último recurso.
++ */
++export function ehDoUsuario(a: Atividade, u: { id: string; email: string; nome: string }): boolean {
++  return a.responsavelId === u.id || a.responsavelId === u.email || a.responsavelNome === u.nome;
++}
+--- a/src/lib/db/permissoes.ts	2026-10-04 00:17:07.000000000 +0000
++++ b/src/lib/db/permissoes.ts	2026-10-04 00:32:16.758787517 +0000
+@@ -6,6 +6,7 @@
+   { id: "menu.clientes", nome: "Ver Clientes" },
+   { id: "menu.funil", nome: "Ver Funil" },
+   { id: "menu.usuarios", nome: "Ver Usuários" },
++  { id: "menu.atividades", nome: "Ver Atividades" },
+   { id: "funil.comercial", nome: "Ver funil Comercial" },
+   { id: "funil.engenharia", nome: "Ver funil Engenharia" },
+   { id: "funil.pos_acompanhamento", nome: "Ver funil Pós-venda: Acompanhamento" },
+@@ -35,12 +36,12 @@
+ }
+ 
+ export const CARGO_PERMISSOES: CargoPermissao[] = [
+-  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.usuarios", ...ALL_FUNIS]),
+-  ...linhas("vendedor", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "funil.comercial"]),
+-  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "funil.engenharia"]),
+-  ...linhas("financeiro", ["menu.dashboard", "menu.clientes"]),
+-  ...linhas("instalacao", ["menu.dashboard", "menu.clientes"]),
+-  ...linhas("pos_venda", ["menu.dashboard", "menu.clientes", "menu.funil", ...POS_VENDA_FUNIS]),
++  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.usuarios", "menu.atividades", ...ALL_FUNIS]),
++  ...linhas("vendedor", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.atividades", "funil.comercial"]),
++  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.atividades", "funil.engenharia"]),
++  ...linhas("financeiro", ["menu.dashboard", "menu.clientes", "menu.atividades"]),
++  ...linhas("instalacao", ["menu.dashboard", "menu.clientes", "menu.atividades"]),
++  ...linhas("pos_venda", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.atividades", ...POS_VENDA_FUNIS]),
+ ];
+ 
+ /** Confere se um cargo tem determinada permissão — nunca faz `if (cargo === "x")` no resto do app. */
+--- a/src/lib/firebase/atividades.ts	2026-10-04 00:17:07.000000000 +0000
++++ b/src/lib/firebase/atividades.ts	2026-10-04 00:32:16.757162286 +0000
+@@ -2,6 +2,7 @@
+ import { db } from "./config";
+ import { stripUndefined } from "./utils";
+ import { Atividade } from "@/lib/types";
++import { AtividadeDoNegocio } from "@/lib/atividades";
+ 
+ function atividadesRef(dealId: string) {
+   return collection(db, "deals", dealId, "atividades");
+@@ -51,3 +52,26 @@
+ ): Promise<void> {
+   await updateDoc(doc(db, "deals", dealId, "atividades", atividadeId), { concluida });
+ }
++
++/**
++ * Atividades PENDENTES de vários negócios, de uma vez (usado na tela Atividades e nos lembretes).
++ * Uma leitura por negócio, em paralelo, com um único filtro de igualdade — não exige índice
++ * composto nem regra especial no Firestore. Um negócio que falhar não derruba os outros.
++ */
++export async function fetchPendentesDosNegocios(dealIds: string[]): Promise<AtividadeDoNegocio[]> {
++  const grupos = await Promise.all(
++    dealIds.map(async (dealId) => {
++      try {
++        const snap = await getDocs(query(atividadesRef(dealId), where("concluida", "==", false)));
++        return snap.docs.map((d) => ({
++          dealId,
++          atividade: { id: d.id, ...(d.data() as Omit<Atividade, "id">) },
++        }));
++      } catch (err) {
++        console.error(`Erro ao ler atividades do negócio ${dealId}:`, err);
++        return [];
++      }
++    })
++  );
++  return grupos.flat();
++}
+--- a/src/lib/firebase/notificacoes.ts	2026-10-04 00:17:07.000000000 +0000
++++ b/src/lib/firebase/notificacoes.ts	2026-10-04 00:32:16.757544153 +0000
+@@ -1,4 +1,15 @@
+-import { addDoc, collection, doc, onSnapshot, query, updateDoc, where, writeBatch } from "firebase/firestore";
++import {
++  addDoc,
++  collection,
++  doc,
++  getDoc,
++  onSnapshot,
++  query,
++  setDoc,
++  updateDoc,
++  where,
++  writeBatch,
++} from "firebase/firestore";
+ import { db } from "./config";
+ 
+ /** Notificação que aparece no sino da pessoa marcada (coleção `notificacoes`). */
+@@ -6,7 +17,8 @@
+   id: string;
+   /** UID de quem recebe a notificação. */
+   usuarioId: string;
+-  tipo: "mencao" | "novo_negocio";
++  tipo: "mencao" | "novo_negocio" | "atividade_atrasada" | "atividade_hoje";
++  /** Vazio no resumo "atividades para hoje". */
+   dealId: string;
+   dealTitulo: string;
+   /** Só nas menções. */
+@@ -21,6 +33,21 @@
+ 
+ const COLLECTION = "notificacoes";
+ 
++/**
++ * Grava um lembrete com id FIXO, só se ainda não existir — assim o mesmo lembrete nunca
++ * duplica (nem com o CRM aberto em dois computadores) e, depois de lido, não volta.
++ * Devolve true se criou.
++ */
++export async function criarLembreteUmaVez(
++  id: string,
++  dados: Omit<Notificacao, "id" | "criadoEm" | "lida">
++): Promise<boolean> {
++  const ref = doc(db, COLLECTION, id);
++  if ((await getDoc(ref)).exists()) return false;
++  await setDoc(ref, { ...dados, criadoEm: new Date().toISOString(), lida: false });
++  return true;
++}
++
+ /** Avisa quem tem a função da etapa que chegou um card novo (ex.: Engenharia). */
+ export async function criarNotificacoesNovoNegocio(dados: {
+   destinatarios: string[];
+--- a/src/lib/store/AtividadesContext.tsx	1970-01-01 00:00:00.000000000 +0000
++++ b/src/lib/store/AtividadesContext.tsx	2026-10-04 00:34:14.498819786 +0000
+@@ -0,0 +1,149 @@
++"use client";
++
++import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
++import { Atividade } from "@/lib/types";
++import { useAuth } from "@/lib/store/AuthContext";
++import { useCrmData } from "@/lib/store/CrmDataContext";
++import { fetchPendentesDosNegocios, marcarAtividadeConcluida } from "@/lib/firebase/atividades";
++import { criarLembreteUmaVez } from "@/lib/firebase/notificacoes";
++import { AtividadeDoNegocio, ehDoUsuario, ehParaHoje, estaAtrasada, dataLocalISO } from "@/lib/atividades";
++
++type AtividadesContextValue = {
++  /** Atividades PENDENTES dos negócios abertos. */
++  itens: AtividadeDoNegocio[];
++  carregando: boolean;
++  /** Usado pelo painel do negócio: troca as pendentes daquele negócio pelas da lista dele. */
++  substituirDoNegocio: (dealId: string, todas: Atividade[]) => void;
++  marcarConcluida: (dealId: string, atividadeId: string) => Promise<void>;
++  recarregar: () => Promise<void>;
++};
++
++const AtividadesContext = createContext<AtividadesContextValue | null>(null);
++
++const RECARREGAR_APOS_MS = 10 * 60 * 1000;
++
++export function AtividadesProvider({ children }: { children: React.ReactNode }) {
++  const { user } = useAuth();
++  const { deals, dealsLoading } = useCrmData();
++  const [itens, setItens] = useState<AtividadeDoNegocio[]>([]);
++  const [carregando, setCarregando] = useState(true);
++  const carregouRef = useRef(false);
++  const ultimaCargaRef = useRef(0);
++  const dealsRef = useRef(deals);
++  useEffect(() => {
++    dealsRef.current = deals;
++  }, [deals]);
++
++  const recarregar = useCallback(async () => {
++    const ids = dealsRef.current.filter((d) => d.status === "aberto").map((d) => d.id);
++    try {
++      setItens(await fetchPendentesDosNegocios(ids));
++      ultimaCargaRef.current = Date.now();
++    } catch (err) {
++      console.error("Erro ao carregar atividades:", err);
++    } finally {
++      setCarregando(false);
++    }
++  }, []);
++
++  // Primeira carga: assim que a lista de negócios chega.
++  useEffect(() => {
++    if (dealsLoading || carregouRef.current) return;
++    carregouRef.current = true;
++    recarregar();
++  }, [dealsLoading, recarregar]);
++
++  // Volta pra aba depois de um tempo: atualiza (outra pessoa pode ter criado atividade).
++  useEffect(() => {
++    function aoVoltar() {
++      if (document.visibilityState === "visible" && Date.now() - ultimaCargaRef.current > RECARREGAR_APOS_MS) {
++        recarregar();
++      }
++    }
++    document.addEventListener("visibilitychange", aoVoltar);
++    return () => document.removeEventListener("visibilitychange", aoVoltar);
++  }, [recarregar]);
++
++  const substituirDoNegocio = useCallback((dealId: string, todas: Atividade[]) => {
++    setItens((prev) => [
++      ...prev.filter((i) => i.dealId !== dealId),
++      ...todas.filter((a) => !a.concluida).map((atividade) => ({ dealId, atividade })),
++    ]);
++  }, []);
++
++  const marcarConcluida = useCallback(
++    async (dealId: string, atividadeId: string) => {
++      setItens((prev) => prev.filter((i) => !(i.dealId === dealId && i.atividade.id === atividadeId)));
++      try {
++        await marcarAtividadeConcluida(dealId, atividadeId, true);
++      } catch (err) {
++        console.error("Erro ao concluir atividade:", err);
++        await recarregar();
++        throw err;
++      }
++    },
++    [recarregar]
++  );
++
++  // Lembretes no sino: confere a cada minuto (com o CRM aberto) e grava UMA notificação por
++  // atividade atrasada e UM resumo por dia. O id da notificação é fixo, então nunca duplica,
++  // nem com o CRM aberto em dois lugares.
++  const jaTratadas = useRef(new Set<string>());
++  useEffect(() => {
++    if (!user || carregando) return;
++
++    function checar() {
++      if (!user) return;
++      const agora = new Date();
++      const minhas = itens.filter((i) => ehDoUsuario(i.atividade, user));
++
++      for (const { dealId, atividade } of minhas) {
++        if (!estaAtrasada(atividade, agora)) continue;
++        const id = `lembrete-atrasada-${atividade.id}`;
++        if (jaTratadas.current.has(id)) continue;
++        jaTratadas.current.add(id);
++        const deal = dealsRef.current.find((d) => d.id === dealId);
++        criarLembreteUmaVez(id, {
++          usuarioId: user.id,
++          tipo: "atividade_atrasada",
++          dealId,
++          dealTitulo: deal?.titulo ?? "Negócio",
++          deId: "",
++          deNome: "",
++          trecho: atividade.titulo,
++        }).catch((err) => console.error("Erro ao criar lembrete:", err));
++      }
++
++      const paraHoje = minhas.filter((i) => ehParaHoje(i.atividade, agora)).length;
++      const idHoje = `lembrete-hoje-${user.id}-${dataLocalISO(agora)}`;
++      if (paraHoje > 0 && !jaTratadas.current.has(idHoje)) {
++        jaTratadas.current.add(idHoje);
++        criarLembreteUmaVez(idHoje, {
++          usuarioId: user.id,
++          tipo: "atividade_hoje",
++          dealId: "",
++          dealTitulo: "",
++          deId: "",
++          deNome: "",
++          trecho: paraHoje === 1 ? "Você tem 1 atividade para hoje" : `Você tem ${paraHoje} atividades para hoje`,
++        }).catch((err) => console.error("Erro ao criar lembrete:", err));
++      }
++    }
++
++    checar();
++    const timer = setInterval(checar, 60_000);
++    return () => clearInterval(timer);
++  }, [itens, carregando, user]);
++
++  const value = useMemo(
++    () => ({ itens, carregando, substituirDoNegocio, marcarConcluida, recarregar }),
++    [itens, carregando, substituirDoNegocio, marcarConcluida, recarregar]
++  );
++  return <AtividadesContext.Provider value={value}>{children}</AtividadesContext.Provider>;
++}
++
++export function useAtividades() {
++  const ctx = useContext(AtividadesContext);
++  if (!ctx) throw new Error("useAtividades must be used within AtividadesProvider");
++  return ctx;
++}
+--- a/src/lib/types.ts	2026-10-04 00:17:07.000000000 +0000
++++ b/src/lib/types.ts	2026-10-04 00:32:16.756564212 +0000
+@@ -149,8 +149,10 @@
+   titulo: string;
+   prioridade: DealPrioridade;
+   data: string; // YYYY-MM-DD
+-  horaInicio: string; // HH:mm
+-  horaFim: string; // HH:mm
++  /** "Dia todo": sem horário (horaInicio/horaFim ficam vazios). Atividades antigas têm horário. */
++  diaTodo?: boolean;
++  horaInicio: string; // HH:mm — vazio quando diaTodo
++  horaFim: string; // HH:mm — vazio quando diaTodo
+   responsavelId: string;
+   responsavelNome: string;
+   observacoes?: string;

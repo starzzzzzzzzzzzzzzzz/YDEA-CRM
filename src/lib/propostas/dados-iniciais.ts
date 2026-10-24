@@ -80,6 +80,7 @@ export function dadosIniciais(args: {
     usinaObservacao: "",
 
     concessionaria: deal?.concessionaria ?? deal?.distribuidora ?? cliente?.distribuidora ?? "",
+    perfilConcessionaria: "B1",
     codigoUC: deal?.numeroUC ?? cliente?.unidadeConsumidora ?? "",
     fase: faseDeTexto(deal?.fase ?? cliente?.tipoLigacao),
     tensao: deal?.tensao ?? "V220",

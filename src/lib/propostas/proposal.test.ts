@@ -26,6 +26,8 @@ import {
   valorPorExtenso,
 } from "./proposal-text";
 import { validarEtapa } from "./validacao";
+import { interpretarTarifas, siglaDaConcessionaria } from "./aneel";
+import { importarInversores, importarModulos, numeroBR } from "./catalogo-import";
 import type { PropostaDados } from "./types";
 
 /**
@@ -57,6 +59,7 @@ function dadosDeReferencia(): PropostaDados {
     usinaCep: "",
     usinaObservacao: "",
     concessionaria: "COSERN",
+    perfilConcessionaria: "B1",
     codigoUC: "",
     fase: "monofasico",
     tensao: "V220",
@@ -315,5 +318,107 @@ describe("validação das etapas", () => {
     const d = dadosDeReferencia();
     d.inversores[0].valorUnitario = 0;
     assert.ok("inversores" in validarEtapa(d, 2));
+  });
+});
+
+describe("tarifas da ANEEL (linhas no formato do dicionário de dados)", () => {
+  const hom = (extra: Record<string, unknown> = {}) => ({
+    SigAgente: "COSERN",
+    DscBaseTarifaria: "Tarifa de Aplicação",
+    DscSubGrupoTarifario: "B1",
+    DscModalidadeTarifaria: "Convencional",
+    DscDetalheConsumidor: "Não se aplica",
+    NomPostoTarifario: "Não se aplica",
+    DscUnidade: "R$/MWh",
+    DatInicioVigencia: "2026-04-22",
+    DatFimVigencia: "2027-04-21",
+    VlrTUSD: "639,40",
+    VlrTE: "388,97",
+    ...extra,
+  });
+  const comp = (nome: string, valor: string, extra: Record<string, unknown> = {}) => ({
+    SigNomeAgente: "COSERN",
+    DscBaseTarifaria: "Tarifa de Aplicação",
+    DscSubGrupoTarifario: "B1",
+    DscModalidadeTarifaria: "Convencional",
+    DscPostoTarifario: "Não se aplica",
+    DscUnidade: "R$/MWh",
+    DatInicioVigencia: "2026-04-22",
+    DatFimVigencia: "2027-04-21",
+    DscComponenteTarifario: nome,
+    VlrComponenteTarifario: valor,
+    ...extra,
+  });
+
+  it("sigla a partir do texto da concessionária", () => {
+    assert.equal(siglaDaConcessionaria("COSERN - Neoenergia Cosern"), "COSERN");
+  });
+
+  it("converte R$/MWh em R$/kWh e acha o Fio B", () => {
+    const r = interpretarTarifas({
+      homologadas: [hom()],
+      componentes: [comp("TUSD_Perdas", "10,00"), comp("TUSD_FioB", "353,92")],
+      sigla: "COSERN", subgrupo: "B1", hoje: "2026-10-24",
+    });
+    assert.ok(!("erro" in r));
+    if ("erro" in r) return;
+    assert.equal(r.te, 0.38897);
+    assert.equal(r.tusd, 0.6394);
+    assert.equal(r.fioB, 0.35392);
+    assert.deepEqual(r.avisos, []);
+  });
+
+  it("usa a vigência mais recente e ignora outras linhas (subgrupo, posto, agente)", () => {
+    const r = interpretarTarifas({
+      homologadas: [
+        hom({ DatInicioVigencia: "2025-04-22", DatFimVigencia: "2026-04-21", VlrTE: "300,00" }),
+        hom(),
+        hom({ DscSubGrupoTarifario: "B3", VlrTE: "999,00" }),
+        hom({ NomPostoTarifario: "Ponta", VlrTE: "888,00" }),
+        hom({ SigAgente: "ENEL CE", VlrTE: "777,00" }),
+      ],
+      componentes: [], sigla: "COSERN", subgrupo: "B1", hoje: "2026-10-24",
+    });
+    assert.ok(!("erro" in r));
+    if ("erro" in r) return;
+    assert.equal(r.te, 0.38897);
+    assert.equal(r.vigenciaInicio, "2026-04-22");
+  });
+
+  it("sem Fio B devolve null e avisa (não inventa valor)", () => {
+    const r = interpretarTarifas({ homologadas: [hom()], componentes: [comp("TE_Energia", "100,00")], sigla: "COSERN", subgrupo: "B1", hoje: "2026-10-24" });
+    assert.ok(!("erro" in r));
+    if ("erro" in r) return;
+    assert.equal(r.fioB, null);
+    assert.equal(r.avisos.length, 1);
+  });
+
+  it("distribuidora sem dados devolve erro claro", () => {
+    const r = interpretarTarifas({ homologadas: [], componentes: [], sigla: "COSERN", subgrupo: "B1", hoje: "2026-10-24" });
+    assert.ok("erro" in r);
+  });
+});
+
+describe("importação do catálogo", () => {
+  it("números no formato brasileiro", () => {
+    assert.equal(numeroBR("1.234,56"), 1234.56);
+    assert.equal(numeroBR("R$ 2798,05"), 2798.05);
+    assert.equal(numeroBR(""), undefined);
+    assert.ok(Number.isNaN(numeroBR("abc")));
+  });
+
+  it("módulos: ignora cabeçalho e aponta linhas inválidas", () => {
+    const r = importarModulos("marca;modelo;potencia\nAE SOLAR;AE650ME-132BD;650;1302;2384;;12;12\nX;Y;zero\n;;650");
+    assert.equal(r.itens.length, 1);
+    assert.deepEqual(r.itens[0], { marca: "AE SOLAR", modelo: "AE650ME-132BD", potenciaW: 650, larguraMm: 1302, comprimentoMm: 2384, valorUnitario: undefined, garantiaDesempenhoAnos: 12, garantiaFabricacaoAnos: 12 });
+    assert.equal(r.erros.length, 2);
+  });
+
+  it("inversores: fase e tensão", () => {
+    const r = importarInversores("WEG\tSIW200G M050 W1\t5\tV220\tMonofásico\t5500\t2.798,05\t5");
+    assert.equal(r.erros.length, 0);
+    assert.equal(r.itens[0].fase, "monofasico");
+    assert.equal(r.itens[0].valorUnitario, 2798.05);
+    assert.equal(r.itens[0].potenciaMaximaVA, 5500);
   });
 });

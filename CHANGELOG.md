@@ -18,7 +18,11 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 **Pendências conhecidas:** kit gerado pelo sistema (precisa de catálogo de distribuidores); texto das cláusulas gerais do contrato é provisório (`CONTRATO_TEXTO_REVISADO = false` bloqueia a impressão); CNPJ/representante da contratada em `CONTRATADA` em `src/lib/propostas/constants.ts`; premissas da projeção (degradação 0,5%/ano, reajuste 5%/ano, fator de CO₂) em `PREMISSAS`; páginas institucionais ("Quem somos", "Cases") não incluídas.
 
-**Firestore:** novas regras para `propostas` e `contadores` (publicar `firestore.rules`).
+**Tarifas automáticas (ANEEL):** na etapa Dimensionamento, ao informar a concessionária (ex.: "COSERN - Neoenergia Cosern") e o perfil (B1/B2/B3), o CRM busca TE, TUSD e Fio B vigentes nos dados abertos da ANEEL (rota `/api/tarifas`, com cache de 12 h) e preenche os campos; há botão para rebuscar e os campos continuam editáveis. Se a ANEEL não responder ou não achar o Fio B, o campo fica para preenchimento manual (nada é inventado).
+
+**Catálogo de equipamentos:** nova tela `/propostas/catalogo` para cadastrar módulos e inversores (colando linhas de planilha). Na etapa Detalhes, escolher o modelo preenche marca, potência, dimensões, garantias, tensão, fase e valor; também dá para salvar no catálogo o que foi digitado à mão.
+
+**Firestore:** novas regras para `propostas`, `contadores`, `catalogo_modulos` e `catalogo_inversores` (publicar `firestore.rules`).
 
 ---
 

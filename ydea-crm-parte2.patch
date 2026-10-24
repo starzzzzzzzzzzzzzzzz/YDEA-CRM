@@ -1,0 +1,760 @@
+--- a/firestore.rules	2026-10-01 18:58:24.619363228 +0000
++++ b/firestore.rules	2026-10-01 18:29:32.203309642 +0000
+@@ -3,24 +3,27 @@
+ service cloud.firestore {
+   match /databases/{database}/documents {
+ 
+-    // Qualquer pessoa logada pode ler a lista de usuários (é o que popula a tela "Equipe").
+-    // Escrita (criar/editar/apagar) só é feita por quem já é admin — na prática,
+-    // a criação de conta acontece pelo painel de Admin, que usa o Firebase Admin
+-    // SDK no servidor e por isso não passa por essas regras; elas protegem
+-    // ações feitas direto pelo app do navegador, como trocar o cargo de alguém.
++    // Regras para a coleção de Usuários
+     match /usuarios/{userId} {
+       allow read: if request.auth != null;
+       allow write: if request.auth != null &&
+         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.cargoId == "admin";
+     }
+ 
+-    // Clientes são dado de trabalho do dia a dia — qualquer pessoa logada
+-    // (já filtrada pelo RBAC dentro do próprio app) pode ler e escrever.
++    // Regras para Clientes
+     match /clientes/{clienteId} {
+       allow read, write: if request.auth != null;
+     }
+ 
+-    // Negócios (Funil/Kanban) e suas anotações/atividades — mesmo critério dos Clientes.
++    // Organizações e Pessoas criadas pelo Funil (campos de busca do "Novo Negócio")
++    match /organizacoes/{organizacaoId} {
++      allow read, write: if request.auth != null;
++    }
++    match /pessoas/{pessoaId} {
++      allow read, write: if request.auth != null;
++    }
++
++    // Regras para Deals e suas subcoleções
+     match /deals/{dealId} {
+       allow read, write: if request.auth != null;
+ 
+@@ -35,13 +38,18 @@
+       }
+     }
+ 
+-    // Notificações (marcações com @ nas anotações): cada pessoa lê e atualiza só as próprias;
+-    // qualquer pessoa logada pode criar, desde que se identifique como autora (deId).
++    // Notificações (menções com @ nas anotações)
+     match /notificacoes/{notificacaoId} {
+-      allow read, update, delete: if request.auth != null &&
+-        resource.data.usuarioId == request.auth.uid;
+-      allow create: if request.auth != null &&
+-        request.resource.data.deId == request.auth.uid;
++      allow read, write: if request.auth != null;
++    }
++
++    // Funis / etapas (acesso na rota /funil)
++    match /funis/{funilId} {
++      allow read, write: if request.auth != null;
++
++      match /etapas/{etapaId} {
++        allow read, write: if request.auth != null;
++      }
+     }
+   }
+ }
+--- a/src/app/(app)/funil/DealDetailPanel.tsx	2026-10-01 18:58:24.623230566 +0000
++++ b/src/app/(app)/funil/DealDetailPanel.tsx	2026-10-01 18:20:24.950492539 +0000
+@@ -210,7 +210,10 @@
+           autorId: user.id,
+           autorNome: user.nome,
+           texto: notaValue.trim(),
+-        }).catch((err) => console.error("Erro ao notificar os colaboradores marcados:", err));
++        }).catch((err) => {
++          console.error("Erro ao notificar os colaboradores marcados:", err);
++          showToast("Anotação salva, mas a notificação não chegou para quem foi marcado", "error");
++        });
+       }
+       setNotaValue("");
+       setNotaImagens([]);
+--- a/src/app/(app)/instalacoes/KanbanBoard.tsx	2026-10-01 18:58:24.624306477 +0000
++++ b/src/app/(app)/instalacoes/KanbanBoard.tsx	1970-01-01 00:00:00.000000000 +0000
+@@ -1,227 +0,0 @@
+-"use client";
+-
+-import { useMemo, useState } from "react";
+-import {
+-  DndContext,
+-  DragOverlay,
+-  useDraggable,
+-  useDroppable,
+-  PointerSensor,
+-  useSensor,
+-  useSensors,
+-  type DragEndEvent,
+-  type DragStartEvent,
+-} from "@dnd-kit/core";
+-import { Plus, MapPin, Zap } from "lucide-react";
+-import { Lead, STAGES, StageId, TIPO_LABEL } from "@/lib/types";
+-import { useCrmData } from "@/lib/store/CrmDataContext";
+-import NewLeadModal from "./NewLeadModal";
+-
+-const TAG_STYLES: Record<string, string> = {
+-  urgente: "bg-badge-red-bg text-badge-red-text",
+-  financiamento: "bg-badge-blue-bg text-badge-blue-text",
+-  indicação: "bg-badge-green-bg text-badge-green-text",
+-};
+-
+-function formatBRL(value: number) {
+-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+-}
+-
+-function LeadCard({ lead, dragging }: { lead: Lead; dragging?: boolean }) {
+-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+-    id: lead.id,
+-  });
+-
+-  const style = transform
+-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+-    : undefined;
+-
+-  return (
+-    <div
+-      ref={setNodeRef}
+-      style={style}
+-      {...listeners}
+-      {...attributes}
+-      className={`bg-card-bg border border-border rounded-lg px-3.5 py-3 cursor-grab active:cursor-grabbing select-none touch-none ${
+-        isDragging && !dragging ? "opacity-30" : ""
+-      } ${dragging ? "shadow-md rotate-1" : "hover:border-brand"} transition-colors`}
+-    >
+-      <h4 className="font-semibold text-text-dark text-[13px] leading-snug mb-1">
+-        {lead.cliente}
+-      </h4>
+-      <p className="flex items-center gap-1 text-[11.5px] text-text-gray mb-2.5">
+-        <MapPin size={11} className="shrink-0" />
+-        <span className="truncate">{lead.local}</span>
+-      </p>
+-
+-      <div className="flex items-center justify-between mb-2">
+-        <span className="text-[11px] font-medium text-text-gray bg-panel-bg rounded px-1.5 py-0.5">
+-          {TIPO_LABEL[lead.tipo]}
+-        </span>
+-        {lead.potenciaKwp && (
+-          <span className="flex items-center gap-0.5 text-[11px] font-semibold text-brand-strong">
+-            <Zap size={11} />
+-            {lead.potenciaKwp} kWp
+-          </span>
+-        )}
+-      </div>
+-
+-      {lead.tags.length > 0 && (
+-        <div className="flex flex-wrap gap-1.5 mb-2.5">
+-          {lead.tags.map((tag) => (
+-            <span
+-              key={tag}
+-              className={`text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 ${
+-                TAG_STYLES[tag] ?? "bg-panel-bg text-text-gray"
+-              }`}
+-            >
+-              {tag}
+-            </span>
+-          ))}
+-        </div>
+-      )}
+-
+-      <div className="pt-2.5 border-t border-border-soft flex items-center justify-between">
+-        <div className="flex items-center gap-1.5">
+-          <div className="h-5 w-5 rounded-full bg-brand-soft text-brand-strong text-[10px] font-bold flex items-center justify-center">
+-            {lead.responsavel.charAt(0)}
+-          </div>
+-          <span className="text-[11px] text-text-gray">{lead.responsavel}</span>
+-        </div>
+-        <span className="text-[11.5px] font-semibold text-text-dark">
+-          {formatBRL(lead.valor)}
+-        </span>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-function Column({
+-  stageId,
+-  label,
+-  leads,
+-}: {
+-  stageId: StageId;
+-  label: string;
+-  leads: Lead[];
+-}) {
+-  const { setNodeRef, isOver } = useDroppable({ id: stageId });
+-  const total = leads.reduce((sum, l) => sum + l.valor, 0);
+-
+-  return (
+-    <div className="flex flex-col w-72 shrink-0 border-r border-border-soft last:border-r-0 pr-4 last:pr-0">
+-      <div className="px-0.5 mb-3">
+-        <div className="flex items-center justify-between">
+-          <h3 className="text-[13px] font-semibold text-text-dark">{label}</h3>
+-          <span className="text-[11px] font-semibold text-text-faint bg-panel-bg rounded px-1.5 py-0.5">
+-            {leads.length}
+-          </span>
+-        </div>
+-        <span className="text-[11px] text-text-faint">{formatBRL(total)}</span>
+-      </div>
+-      <div
+-        ref={setNodeRef}
+-        className={`flex flex-col gap-2 min-h-[120px] rounded-lg p-1 flex-1 transition-colors ${
+-          isOver ? "bg-brand-soft" : ""
+-        }`}
+-      >
+-        {leads.map((lead) => (
+-          <LeadCard key={lead.id} lead={lead} />
+-        ))}
+-        {leads.length === 0 && (
+-          <div className="text-center text-[11px] text-text-faint py-6 border border-dashed border-border rounded-lg">
+-            Sem leads aqui
+-          </div>
+-        )}
+-      </div>
+-    </div>
+-  );
+-}
+-
+-export default function KanbanBoard() {
+-  const { leads, addLead, updateLead } = useCrmData();
+-  const [activeId, setActiveId] = useState<string | null>(null);
+-  const [modalOpen, setModalOpen] = useState(false);
+-
+-  const sensors = useSensors(
+-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+-  );
+-
+-  const leadsByStage = useMemo(() => {
+-    const map = new Map<StageId, Lead[]>();
+-    STAGES.forEach((s) => map.set(s.id, []));
+-    leads.forEach((lead) => map.get(lead.stage)?.push(lead));
+-    return map;
+-  }, [leads]);
+-
+-  const totalGeral = leads.reduce((sum, l) => sum + l.valor, 0);
+-  const activeLead = leads.find((l) => l.id === activeId);
+-
+-  function handleDragStart(event: DragStartEvent) {
+-    setActiveId(String(event.active.id));
+-  }
+-
+-  function handleDragEnd(event: DragEndEvent) {
+-    const { active, over } = event;
+-    setActiveId(null);
+-    if (!over) return;
+-    const newStage = over.id as StageId;
+-    updateLead(String(active.id), { stage: newStage });
+-  }
+-
+-  function handleCreate(newLead: Omit<Lead, "id" | "stage">) {
+-    addLead(newLead);
+-    setModalOpen(false);
+-  }
+-
+-  return (
+-    <div>
+-      <div className="mb-6">
+-        <h1 className="font-display font-bold text-xl text-text-dark mb-1">Instalações</h1>
+-        <p className="text-[13px] text-text-gray">
+-          Acompanhamento da equipe de campo, do agendamento até a conclusão.
+-        </p>
+-      </div>
+-
+-      <div className="flex items-center justify-between mb-5">
+-        <div className="text-sm text-text-gray">
+-          <span className="font-semibold text-text-dark">{leads.length} negócios</span>
+-          {" · "}
+-          {formatBRL(totalGeral)}
+-        </div>
+-        <button
+-          onClick={() => setModalOpen(true)}
+-          className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-4 py-2 hover:bg-brand-strong transition-colors"
+-        >
+-          <Plus size={16} />
+-          Novo negócio
+-        </button>
+-      </div>
+-
+-      <DndContext
+-        sensors={sensors}
+-        onDragStart={handleDragStart}
+-        onDragEnd={handleDragEnd}
+-      >
+-        <div className="flex gap-4 overflow-x-auto pb-4">
+-          {STAGES.map((stage) => (
+-            <Column
+-              key={stage.id}
+-              stageId={stage.id}
+-              label={stage.label}
+-              leads={leadsByStage.get(stage.id) ?? []}
+-            />
+-          ))}
+-        </div>
+-
+-        <DragOverlay>
+-          {activeLead ? <LeadCard lead={activeLead} dragging /> : null}
+-        </DragOverlay>
+-      </DndContext>
+-
+-      {modalOpen && (
+-        <NewLeadModal onClose={() => setModalOpen(false)} onCreate={handleCreate} />
+-      )}
+-    </div>
+-  );
+-}
+--- a/src/app/(app)/instalacoes/NewLeadModal.tsx	2026-10-01 18:58:24.624363297 +0000
++++ b/src/app/(app)/instalacoes/NewLeadModal.tsx	1970-01-01 00:00:00.000000000 +0000
+@@ -1,140 +0,0 @@
+-"use client";
+-
+-import { useState } from "react";
+-import { X } from "lucide-react";
+-import { Lead, LeadTipo, TIPO_LABEL } from "@/lib/types";
+-
+-const TIPOS: LeadTipo[] = ["residencial", "comercial", "rural"];
+-
+-export default function NewLeadModal({
+-  onClose,
+-  onCreate,
+-}: {
+-  onClose: () => void;
+-  onCreate: (lead: Omit<Lead, "id" | "stage">) => void;
+-}) {
+-  const [cliente, setCliente] = useState("");
+-  const [local, setLocal] = useState("");
+-  const [tipo, setTipo] = useState<LeadTipo>("residencial");
+-  const [valor, setValor] = useState("");
+-  const [responsavel, setResponsavel] = useState("");
+-
+-  function handleSubmit(e: React.FormEvent) {
+-    e.preventDefault();
+-    if (!cliente.trim() || !local.trim() || !responsavel.trim()) return;
+-    onCreate({
+-      cliente,
+-      local,
+-      tipo,
+-      responsavel,
+-      valor: Number(valor) || 0,
+-      tags: [],
+-    });
+-  }
+-
+-  return (
+-    <div
+-      className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4"
+-      onClick={onClose}
+-    >
+-      <div
+-        className="bg-card-bg rounded-xl shadow-xl border border-border w-full max-w-sm p-6"
+-        onClick={(e) => e.stopPropagation()}
+-      >
+-        <div className="flex items-center justify-between mb-5">
+-          <h2 className="font-display font-semibold text-text-dark text-base">
+-            Novo negócio
+-          </h2>
+-          <button
+-            onClick={onClose}
+-            className="text-text-faint hover:text-text-gray"
+-            aria-label="Fechar"
+-          >
+-            <X size={18} />
+-          </button>
+-        </div>
+-
+-        <form onSubmit={handleSubmit} className="space-y-4">
+-          <div>
+-            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
+-              CLIENTE
+-            </label>
+-            <input
+-              value={cliente}
+-              onChange={(e) => setCliente(e.target.value)}
+-              placeholder="Nome do cliente"
+-              className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+-            />
+-          </div>
+-
+-          <div>
+-            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
+-              LOCAL
+-            </label>
+-            <input
+-              value={local}
+-              onChange={(e) => setLocal(e.target.value)}
+-              placeholder="Endereço ou referência"
+-              className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+-            />
+-          </div>
+-
+-          <div className="grid grid-cols-2 gap-3">
+-            <div>
+-              <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
+-                VALOR (R$)
+-              </label>
+-              <input
+-                value={valor}
+-                onChange={(e) => setValor(e.target.value.replace(/\D/g, ""))}
+-                inputMode="numeric"
+-                placeholder="0"
+-                className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+-              />
+-            </div>
+-            <div>
+-              <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
+-                RESPONSÁVEL
+-              </label>
+-              <input
+-                value={responsavel}
+-                onChange={(e) => setResponsavel(e.target.value)}
+-                placeholder="Nome"
+-                className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+-              />
+-            </div>
+-          </div>
+-
+-          <div>
+-            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
+-              TIPO
+-            </label>
+-            <div className="flex gap-2">
+-              {TIPOS.map((t) => (
+-                <button
+-                  type="button"
+-                  key={t}
+-                  onClick={() => setTipo(t)}
+-                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium border transition-colors ${
+-                    tipo === t
+-                      ? "bg-brand border-brand text-text-dark"
+-                      : "bg-panel-bg border-border text-text-gray hover:text-text-dark"
+-                  }`}
+-                >
+-                  {TIPO_LABEL[t]}
+-                </button>
+-              ))}
+-            </div>
+-          </div>
+-
+-          <button
+-            type="submit"
+-            className="w-full rounded-lg bg-brand text-text-dark font-semibold text-sm py-2.5 mt-1 hover:bg-brand-strong transition-colors"
+-          >
+-            Adicionar ao funil
+-          </button>
+-        </form>
+-      </div>
+-    </div>
+-  );
+-}
+--- a/src/app/(app)/instalacoes/page.tsx	2026-10-01 18:58:24.624421316 +0000
++++ b/src/app/(app)/instalacoes/page.tsx	1970-01-01 00:00:00.000000000 +0000
+@@ -1,5 +0,0 @@
+-import KanbanBoard from "./KanbanBoard";
+-
+-export default function InstalacoesPage() {
+-  return <KanbanBoard />;
+-}
+--- a/src/app/(app)/leads/LeadsTable.tsx	2026-10-01 18:58:24.624544711 +0000
++++ b/src/app/(app)/leads/LeadsTable.tsx	2026-10-01 18:52:32.751186247 +0000
+@@ -4,7 +4,7 @@
+ import { Search, Plus, Zap, Download } from "lucide-react";
+ import { Lead, LeadTipo, STAGES, StageId, TIPO_LABEL } from "@/lib/types";
+ import { useCrmData } from "@/lib/store/CrmDataContext";
+-import NewLeadModal from "../instalacoes/NewLeadModal";
++import NewLeadModal from "./NewLeadModal";
+ 
+ const TAG_STYLES: Record<string, string> = {
+   urgente: "bg-badge-red-bg text-badge-red-text",
+--- a/src/app/(app)/leads/NewLeadModal.tsx	1970-01-01 00:00:00.000000000 +0000
++++ b/src/app/(app)/leads/NewLeadModal.tsx	2026-10-01 17:49:29.000000000 +0000
+@@ -0,0 +1,140 @@
++"use client";
++
++import { useState } from "react";
++import { X } from "lucide-react";
++import { Lead, LeadTipo, TIPO_LABEL } from "@/lib/types";
++
++const TIPOS: LeadTipo[] = ["residencial", "comercial", "rural"];
++
++export default function NewLeadModal({
++  onClose,
++  onCreate,
++}: {
++  onClose: () => void;
++  onCreate: (lead: Omit<Lead, "id" | "stage">) => void;
++}) {
++  const [cliente, setCliente] = useState("");
++  const [local, setLocal] = useState("");
++  const [tipo, setTipo] = useState<LeadTipo>("residencial");
++  const [valor, setValor] = useState("");
++  const [responsavel, setResponsavel] = useState("");
++
++  function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    if (!cliente.trim() || !local.trim() || !responsavel.trim()) return;
++    onCreate({
++      cliente,
++      local,
++      tipo,
++      responsavel,
++      valor: Number(valor) || 0,
++      tags: [],
++    });
++  }
++
++  return (
++    <div
++      className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4"
++      onClick={onClose}
++    >
++      <div
++        className="bg-card-bg rounded-xl shadow-xl border border-border w-full max-w-sm p-6"
++        onClick={(e) => e.stopPropagation()}
++      >
++        <div className="flex items-center justify-between mb-5">
++          <h2 className="font-display font-semibold text-text-dark text-base">
++            Novo negócio
++          </h2>
++          <button
++            onClick={onClose}
++            className="text-text-faint hover:text-text-gray"
++            aria-label="Fechar"
++          >
++            <X size={18} />
++          </button>
++        </div>
++
++        <form onSubmit={handleSubmit} className="space-y-4">
++          <div>
++            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
++              CLIENTE
++            </label>
++            <input
++              value={cliente}
++              onChange={(e) => setCliente(e.target.value)}
++              placeholder="Nome do cliente"
++              className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
++            />
++          </div>
++
++          <div>
++            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
++              LOCAL
++            </label>
++            <input
++              value={local}
++              onChange={(e) => setLocal(e.target.value)}
++              placeholder="Endereço ou referência"
++              className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
++            />
++          </div>
++
++          <div className="grid grid-cols-2 gap-3">
++            <div>
++              <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
++                VALOR (R$)
++              </label>
++              <input
++                value={valor}
++                onChange={(e) => setValor(e.target.value.replace(/\D/g, ""))}
++                inputMode="numeric"
++                placeholder="0"
++                className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
++              />
++            </div>
++            <div>
++              <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
++                RESPONSÁVEL
++              </label>
++              <input
++                value={responsavel}
++                onChange={(e) => setResponsavel(e.target.value)}
++                placeholder="Nome"
++                className="w-full rounded-lg bg-panel-bg border border-border px-3.5 py-2.5 text-sm text-text-dark placeholder:text-text-faint outline-none focus:border-brand focus:ring-1 focus:ring-brand"
++              />
++            </div>
++          </div>
++
++          <div>
++            <label className="block text-xs font-semibold text-text-gray mb-1.5 tracking-wide">
++              TIPO
++            </label>
++            <div className="flex gap-2">
++              {TIPOS.map((t) => (
++                <button
++                  type="button"
++                  key={t}
++                  onClick={() => setTipo(t)}
++                  className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium border transition-colors ${
++                    tipo === t
++                      ? "bg-brand border-brand text-text-dark"
++                      : "bg-panel-bg border-border text-text-gray hover:text-text-dark"
++                  }`}
++                >
++                  {TIPO_LABEL[t]}
++                </button>
++              ))}
++            </div>
++          </div>
++
++          <button
++            type="submit"
++            className="w-full rounded-lg bg-brand text-text-dark font-semibold text-sm py-2.5 mt-1 hover:bg-brand-strong transition-colors"
++          >
++            Adicionar ao funil
++          </button>
++        </form>
++      </div>
++    </div>
++  );
++}
+--- a/src/components/AppShell.tsx	2026-10-01 18:58:24.625324287 +0000
++++ b/src/components/AppShell.tsx	2026-10-01 18:52:32.751733526 +0000
+@@ -8,7 +8,6 @@
+   Contact,
+   BookUser,
+   Filter,
+-  Wrench,
+   Users,
+   Calendar,
+   Sparkles,
+@@ -42,7 +41,6 @@
+   { href: "/leads", label: "Leads", icon: Contact, active: true, permissaoId: "menu.leads" },
+   { href: "/clientes", label: "Clientes", icon: BookUser, active: true, permissaoId: "menu.clientes" },
+   { href: "/funil", label: "Funil", icon: Filter, active: true, permissaoId: "menu.funil" },
+-  { href: "/instalacoes", label: "Instalações", icon: Wrench, active: true, permissaoId: "menu.instalacoes" },
+   { href: "/usuarios", label: "Equipe", icon: Users, active: true, permissaoId: "menu.usuarios" },
+   { href: "#", label: "Atividades", icon: Calendar, active: false, permissaoId: "" },
+   { href: "#", label: "IA", icon: Sparkles, active: false, permissaoId: "" },
+@@ -54,7 +52,6 @@
+   "/leads": "Leads",
+   "/clientes": "Clientes",
+   "/funil": "Funil",
+-  "/instalacoes": "Instalações",
+   "/usuarios": "Equipe",
+ };
+ 
+--- a/src/lib/db/permissoes.ts	2026-10-01 18:58:24.626593282 +0000
++++ b/src/lib/db/permissoes.ts	2026-10-01 18:52:32.752103631 +0000
+@@ -5,7 +5,6 @@
+   { id: "menu.leads", nome: "Ver Leads" },
+   { id: "menu.clientes", nome: "Ver Clientes" },
+   { id: "menu.funil", nome: "Ver Funil" },
+-  { id: "menu.instalacoes", nome: "Ver Instalações" },
+   { id: "menu.usuarios", nome: "Ver Usuários" },
+   { id: "funil.comercial", nome: "Ver funil Comercial" },
+   { id: "funil.engenharia", nome: "Ver funil Engenharia" },
+@@ -36,11 +35,11 @@
+ }
+ 
+ export const CARGO_PERMISSOES: CargoPermissao[] = [
+-  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.instalacoes", "menu.usuarios", ...ALL_FUNIS]),
++  ...linhas("admin", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "menu.usuarios", ...ALL_FUNIS]),
+   ...linhas("vendedor", ["menu.dashboard", "menu.leads", "menu.clientes", "menu.funil", "funil.comercial"]),
+-  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "menu.instalacoes", "funil.engenharia"]),
++  ...linhas("projetista", ["menu.dashboard", "menu.clientes", "menu.funil", "funil.engenharia"]),
+   ...linhas("financeiro", ["menu.dashboard", "menu.clientes"]),
+-  ...linhas("instalacao", ["menu.dashboard", "menu.clientes", "menu.instalacoes"]),
++  ...linhas("instalacao", ["menu.dashboard", "menu.clientes"]),
+   ...linhas("pos_venda", ["menu.dashboard", "menu.clientes", "menu.funil", ...POS_VENDA_FUNIS]),
+ ];
+ 
+--- a/src/lib/firebase/cadastros.ts	1970-01-01 00:00:00.000000000 +0000
++++ b/src/lib/firebase/cadastros.ts	2026-10-01 18:29:32.151230195 +0000
+@@ -0,0 +1,31 @@
++import { collection, doc, getDocs, setDoc } from "firebase/firestore";
++import { db } from "./config";
++import { stripUndefined } from "./utils";
++import { Organizacao, Pessoa } from "@/lib/types";
++
++/**
++ * Organizações e Pessoas criadas pelo Funil (coleções `organizacoes` e `pessoas`).
++ * O id é gerado no modal e usado como id do documento, assim os negócios que
++ * guardam `organizacaoId` / `pessoaId` continuam apontando pro lugar certo
++ * depois de recarregar a página.
++ */
++
++export async function fetchOrganizacoes(): Promise<Organizacao[]> {
++  const snap = await getDocs(collection(db, "organizacoes"));
++  return snap.docs.map((d) => ({ ...(d.data() as Omit<Organizacao, "id">), id: d.id }));
++}
++
++export async function fetchPessoas(): Promise<Pessoa[]> {
++  const snap = await getDocs(collection(db, "pessoas"));
++  return snap.docs.map((d) => ({ ...(d.data() as Omit<Pessoa, "id">), id: d.id }));
++}
++
++export async function saveOrganizacao(org: Organizacao): Promise<void> {
++  const { id, ...dados } = org;
++  await setDoc(doc(db, "organizacoes", id), stripUndefined(dados));
++}
++
++export async function savePessoa(pessoa: Pessoa): Promise<void> {
++  const { id, ...dados } = pessoa;
++  await setDoc(doc(db, "pessoas", id), stripUndefined(dados));
++}
+--- a/src/lib/store/CrmDataContext.tsx	2026-10-01 18:58:24.631763969 +0000
++++ b/src/lib/store/CrmDataContext.tsx	2026-10-01 18:29:32.197398017 +0000
+@@ -16,6 +16,12 @@
+ import { MOCK_LEADS } from "@/lib/mock-leads";
+ import { fetchClientes, createCliente } from "@/lib/firebase/clientes";
+ import {
++  fetchOrganizacoes,
++  fetchPessoas,
++  saveOrganizacao,
++  savePessoa,
++} from "@/lib/firebase/cadastros";
++import {
+   fetchDeals,
+   createDeal,
+   AnexosFalharam,
+@@ -73,6 +79,29 @@
+   // Leads ainda são dado fictício em memória — próxima frente a migrar pro Firestore.
+   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+ 
++  // Organizações e pessoas criadas no Funil ficam no Firestore; os dados fictícios
++  // continuam na lista (por último) só pra não quebrar negócios antigos que apontam pra eles.
++  useEffect(() => {
++    let cancelado = false;
++    fetchOrganizacoes()
++      .then((rows) => {
++        if (cancelado) return;
++        const ids = new Set(rows.map((r) => r.id));
++        setOrganizacoes([...rows, ...MOCK_ORGANIZACOES.filter((m) => !ids.has(m.id))]);
++      })
++      .catch((err) => console.error("Erro ao carregar organizações do Firestore:", err));
++    fetchPessoas()
++      .then((rows) => {
++        if (cancelado) return;
++        const ids = new Set(rows.map((r) => r.id));
++        setPessoas([...rows, ...MOCK_PESSOAS.filter((m) => !ids.has(m.id))]);
++      })
++      .catch((err) => console.error("Erro ao carregar pessoas do Firestore:", err));
++    return () => {
++      cancelado = true;
++    };
++  }, []);
++
+   useEffect(() => {
+     let cancelado = false;
+     fetchClientes()
+@@ -105,6 +134,9 @@
+ 
+   function addOrganizacao(org: Organizacao) {
+     setOrganizacoes((prev) => [org, ...prev]);
++    saveOrganizacao(org).catch((err) =>
++      console.error("Erro ao salvar organização no Firestore:", err)
++    );
+     const dados: Omit<Cliente, "id" | "codigo" | "createdAt"> = {
+       tipoPessoa: org.tipo,
+       nome: org.nome,
+@@ -138,6 +170,7 @@
+ 
+   function addPessoa(pessoa: Pessoa) {
+     setPessoas((prev) => [pessoa, ...prev]);
++    savePessoa(pessoa).catch((err) => console.error("Erro ao salvar pessoa no Firestore:", err));
+     const vinculada = pessoa.organizacaoId
+       ? organizacoes.find((o) => o.id === pessoa.organizacaoId)
+       : undefined;

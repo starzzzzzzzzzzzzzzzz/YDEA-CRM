@@ -1,6 +1,8 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { BookmarkPlus, Plus, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
+import { salvarInversorCatalogo, salvarModuloCatalogo } from "@/lib/firebase/catalogo";
 import { Field, inputClass, inputErrorClass } from "@/components/ui/Field";
 import { inversorVazio, novoId } from "@/lib/propostas/dados-iniciais";
 import { ALIQUOTA_COMISSAO, ALIQUOTA_IMPOSTO, MAO_DE_OBRA_POR_MODULO, calcularProposta } from "@/lib/propostas/proposal-calculations";
@@ -8,12 +10,15 @@ import { formatarBRL, formatarNumero } from "@/lib/propostas/proposal-text";
 import { TENSOES_REDE } from "@/lib/propostas/constants";
 import { FASE_LABEL, type FaseRede, type InversorKit } from "@/lib/propostas/types";
 import { EtapaProps, MoedaInput, NumeroInput, Resumo, Secao } from "../ui";
+import { useCatalogo } from "../useCatalogo";
 
 const btnSec =
   "flex items-center gap-1.5 rounded-lg border border-border text-text-gray font-semibold text-[13px] px-3 py-1.5 hover:bg-panel-bg transition-colors";
 
 export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
   const r = calcularProposta(dados);
+  const { showToast } = useToast();
+  const { modulos: catModulos, inversores: catInversores, recarregar } = useCatalogo();
   const cls = (campo: string) => `${inputClass} ${erros[campo] ? inputErrorClass : ""}`;
 
   function setModulo<K extends keyof typeof dados.modulo>(campo: K, valor: (typeof dados.modulo)[K]) {
@@ -21,6 +26,82 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
   }
   function setInversor(id: string, patch: Partial<InversorKit>) {
     set("inversores", dados.inversores.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
+
+  /** Digitou/escolheu um modelo que existe no catálogo → preenche o resto. */
+  function escolherModulo(modelo: string) {
+    const achado = catModulos.find((m) => m.modelo === modelo && (!dados.modulo.marca || m.marca === dados.modulo.marca));
+    if (!achado) {
+      setModulo("modelo", modelo);
+      return;
+    }
+    set("modulo", {
+      ...dados.modulo,
+      marca: achado.marca,
+      modelo: achado.modelo,
+      potenciaW: achado.potenciaW,
+      larguraMm: achado.larguraMm,
+      comprimentoMm: achado.comprimentoMm,
+      valorUnitario: achado.valorUnitario ?? dados.modulo.valorUnitario,
+      garantiaDesempenhoAnos: achado.garantiaDesempenhoAnos,
+      garantiaFabricacaoAnos: achado.garantiaFabricacaoAnos,
+    });
+  }
+
+  function escolherInversor(id: string, modelo: string) {
+    const atual = dados.inversores.find((i) => i.id === id);
+    const achado = catInversores.find((i) => i.modelo === modelo && (!atual?.marca || i.marca === atual.marca));
+    if (!achado) {
+      setInversor(id, { modelo });
+      return;
+    }
+    setInversor(id, {
+      marca: achado.marca,
+      modelo: achado.modelo,
+      potenciaKw: achado.potenciaKw,
+      tensaoSaida: achado.tensaoSaida,
+      fase: achado.fase,
+      potenciaMaximaVA: achado.potenciaMaximaVA,
+      valorUnitario: achado.valorUnitario ?? atual?.valorUnitario ?? 0,
+      garantiaFabricacaoAnos: achado.garantiaFabricacaoAnos,
+    });
+  }
+
+  async function salvarModuloNoCatalogo() {
+    const m = dados.modulo;
+    if (!m.marca.trim() || !m.modelo.trim() || !(m.potenciaW > 0)) {
+      showToast("Preencha marca, modelo e potência do módulo", "error");
+      return;
+    }
+    try {
+      await salvarModuloCatalogo({
+        marca: m.marca.trim(), modelo: m.modelo.trim(), potenciaW: m.potenciaW,
+        larguraMm: m.larguraMm, comprimentoMm: m.comprimentoMm, valorUnitario: m.valorUnitario || undefined,
+        garantiaDesempenhoAnos: m.garantiaDesempenhoAnos, garantiaFabricacaoAnos: m.garantiaFabricacaoAnos,
+      });
+      await recarregar();
+      showToast("Módulo salvo no catálogo");
+    } catch {
+      showToast("Erro ao salvar no catálogo", "error");
+    }
+  }
+
+  async function salvarInversorNoCatalogo(inv: InversorKit) {
+    if (!inv.marca.trim() || !inv.modelo.trim() || !(inv.potenciaKw > 0)) {
+      showToast("Preencha marca, modelo e potência do inversor", "error");
+      return;
+    }
+    try {
+      await salvarInversorCatalogo({
+        marca: inv.marca.trim(), modelo: inv.modelo.trim(), potenciaKw: inv.potenciaKw, tensaoSaida: inv.tensaoSaida,
+        fase: inv.fase, potenciaMaximaVA: inv.potenciaMaximaVA, valorUnitario: inv.valorUnitario || undefined,
+        garantiaFabricacaoAnos: inv.garantiaFabricacaoAnos,
+      });
+      await recarregar();
+      showToast("Inversor salvo no catálogo");
+    } catch {
+      showToast("Erro ao salvar no catálogo", "error");
+    }
   }
 
   return (
@@ -58,13 +139,25 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
       <Secao titulo="Módulo" subtitulo={`Quantidade sugerida pelo dimensionamento: ${r.quantidadeModulosCalculada}`}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Marca do módulo" required error={erros.moduloMarca}>
-            <input className={cls("moduloMarca")} value={dados.modulo.marca} onChange={(e) => setModulo("marca", e.target.value)} />
+            <input list="cat-marcas-modulo" className={cls("moduloMarca")} value={dados.modulo.marca} onChange={(e) => setModulo("marca", e.target.value)} />
+            <datalist id="cat-marcas-modulo">
+              {[...new Set(catModulos.map((m) => m.marca))].map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
           </Field>
           <Field label="Potência do módulo" required error={erros.moduloPotencia}>
             <NumeroInput value={dados.modulo.potenciaW} onChange={(n) => setModulo("potenciaW", n)} sufixo="W" className={erros.moduloPotencia ? inputErrorClass : ""} />
           </Field>
-          <Field label="Modelo do módulo" required error={erros.moduloModelo}>
-            <input className={cls("moduloModelo")} value={dados.modulo.modelo} onChange={(e) => setModulo("modelo", e.target.value)} />
+          <Field label="Modelo do módulo" required error={erros.moduloModelo} hint="Escolha da lista para preencher potência, dimensões e garantias.">
+            <input list="cat-modelos-modulo" className={cls("moduloModelo")} value={dados.modulo.modelo} onChange={(e) => escolherModulo(e.target.value)} />
+            <datalist id="cat-modelos-modulo">
+              {catModulos
+                .filter((m) => !dados.modulo.marca || m.marca === dados.modulo.marca)
+                .map((m) => (
+                  <option key={m.id} value={m.modelo} label={`${m.marca} · ${m.potenciaW} W`} />
+                ))}
+            </datalist>
           </Field>
           <Field label="Quantidade" hint="Vazio = usa a quantidade calculada.">
             <NumeroInput value={dados.modulo.quantidade ?? 0} onChange={(n) => setModulo("quantidade", n || undefined)} placeholder={String(r.quantidadeModulosCalculada)} />
@@ -85,6 +178,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
             <NumeroInput value={dados.modulo.garantiaFabricacaoAnos ?? 0} onChange={(n) => setModulo("garantiaFabricacaoAnos", n || undefined)} />
           </Field>
         </div>
+        <button type="button" className={btnSec} onClick={salvarModuloNoCatalogo}>
+          <BookmarkPlus size={14} /> Salvar este módulo no catálogo
+        </button>
       </Secao>
 
       <Secao titulo="Inversores" subtitulo={erros.inversores}>
@@ -100,13 +196,25 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="Marca do inversor" required>
-                <input className={inputClass} value={inv.marca} onChange={(e) => setInversor(inv.id, { marca: e.target.value })} />
+                <input list="cat-marcas-inversor" className={inputClass} value={inv.marca} onChange={(e) => setInversor(inv.id, { marca: e.target.value })} />
+                <datalist id="cat-marcas-inversor">
+                  {[...new Set(catInversores.map((i) => i.marca))].map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
               </Field>
               <Field label="Potência do inversor" required>
                 <NumeroInput value={inv.potenciaKw} onChange={(n) => setInversor(inv.id, { potenciaKw: n })} sufixo="kW" />
               </Field>
               <Field label="Modelo do inversor" required>
-                <input className={inputClass} value={inv.modelo} onChange={(e) => setInversor(inv.id, { modelo: e.target.value })} />
+                <input list={`cat-modelos-inversor-${inv.id}`} className={inputClass} value={inv.modelo} onChange={(e) => escolherInversor(inv.id, e.target.value)} />
+                <datalist id={`cat-modelos-inversor-${inv.id}`}>
+                  {catInversores
+                    .filter((i) => !inv.marca || i.marca === inv.marca)
+                    .map((i) => (
+                      <option key={i.id} value={i.modelo} label={`${i.marca} · ${i.potenciaKw} kW`} />
+                    ))}
+                </datalist>
               </Field>
               <Field label="Tensão de saída" required>
                 <select className={inputClass} value={inv.tensaoSaida} onChange={(e) => setInversor(inv.id, { tensaoSaida: e.target.value })}>
@@ -137,6 +245,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
                 <NumeroInput value={inv.garantiaFabricacaoAnos ?? 0} onChange={(n) => setInversor(inv.id, { garantiaFabricacaoAnos: n || undefined })} />
               </Field>
             </div>
+            <button type="button" className="text-[12px] text-brand-strong hover:underline" onClick={() => salvarInversorNoCatalogo(inv)}>
+              Salvar este inversor no catálogo
+            </button>
           </div>
         ))}
         <button type="button" className={btnSec} onClick={() => set("inversores", [...dados.inversores, inversorVazio()])}>
