@@ -3,6 +3,7 @@
  * Funções puras — sem React, sem Firebase — para poderem ser testadas isoladamente.
  * Todas as regras de negócio do gerador vivem aqui; as telas e os PDFs só consomem.
  */
+
 import type {
   FaseRede,
   ItemComplementar,
@@ -26,13 +27,13 @@ export const ALIQUOTA_IMPOSTO = 0.1358;
 /** Comissão do vendedor embutida no preço (gross-up). */
 export const ALIQUOTA_COMISSAO = 0.03;
 /** Mão de obra de instalação, por módulo (R$). */
-export const MAO_DE_OBRA_POR_MODULO = 80;
+export const MAO_DE_OBRA_POR_MODULO = 80; //depende da instalação e local
 /** Taxa de desempenho padrão (%). */
 export const TAXA_DESEMPENHO_PADRAO_PCT = 75;
 /** Irradiação padrão (Wh/m²·dia). */
-export const IRRADIACAO_PADRAO_WH_M2_DIA = 5788.5;
+export const IRRADIACAO_PADRAO_WH_M2_DIA = 5788.5; //tem que ser baseada em cada cidade de forma automatica nao de um padrão so
 /** Validade padrão da proposta, em dias a partir de hoje. */
-export const VALIDADE_PADRAO_DIAS = 7;
+export const VALIDADE_PADRAO_DIAS = 7; // a data que escolher 
 
 /**
  * PREMISSAS ASSUMIDAS (não vieram das regras de negócio — confirmar com a Ydea).
@@ -140,7 +141,7 @@ export function geracaoPorMes(geracaoAnualKwh: number, ano: number): number[] {
 
 /** Mão de obra de instalação = R$ 80,00 × quantidade de módulos. */
 export function maoDeObraInstalacao(qtdModulos: number): number {
-  return round2(MAO_DE_OBRA_POR_MODULO * qtdModulos);
+  return round2(MAO_DE_OBRA_POR_MODULO * qtdModulos);   
 }
 
 /** Comissão embutida: devolve o preço com a comissão de 3% já dentro. */
@@ -301,3 +302,16 @@ export function calcularProposta(dados: PropostaDados, hoje: Date = new Date()):
     paybackAnos: proj.paybackAnos,
   };
 }
+
+
+
+/* 
+ * precisamos ver agora a questão do valor por modulo que varia de instalação
+e local, o sistema puxar a radiação solar pela cidade que o vai ser localizada a usina
+e nao por uma usina padrão de exemplo.
+proximo passo: fazer uma proposta de uma usina bifasica e trifasica, para que assim pegamos calculos 
+motor de calculo ainda esta pendendente, visual ja esta feito, vou fazer uma planilha como uma especie de banco de dados dos modulos e inversores    
+ * 
+ * 
+ * 
+ */

@@ -1,0 +1,223 @@
+ACatálogo Completo Expansivo por Marca e Modelo** formatado estritamente como uma lista organizada e hierárquica para facilitar a leitura, cópia e população no seu banco de dados:
+
+---
+
+# Catálogo Completo Expansivo por Marca e Modelo
+
+* ### **1. Jinko Solar** *(Líder em Volume e N-Type TOPCon)*
+
+
+* **Tiger Neo N-Type 54HL4 / 54HL4R** *(Residencial / Compacto)*
+* JKM415N-54HL4-V (415W | Voc: 37.92V | Isc: 13.99A | 21.25%)
+* JKM420N-54HL4-V (420W | Voc: 38.11V | Isc: 14.07A | 21.51%)
+* JKM425N-54HL4-V (425W | Voc: 38.30V | Isc: 14.15A | 21.76%)
+* JKM430N-54HL4-V (430W | Voc: 38.49V | Isc: 14.23A | 22.02%)
+* JKM435N-54HL4R-B (435W Full Black | Voc: 39.58V | Isc: 13.94A | 21.77%)
+* JKM440N-54HL4R-V (440W | Voc: 39.78V | Isc: 14.02A | 22.02%)
+
+
+* **Tiger Neo N-Type 72HL4-BDVP / 72HL4-V** *(Comercial / Usinas - Bifacial & Monofacial)*
+* JKM560N-72HL4-V (560W | Voc: 50.47V | Isc: 14.10A | 21.68%)
+* JKM565N-72HL4-BDVP (565W | Voc: 50.67V | Isc: 14.18A | 21.87%)
+* JKM570N-72HL4-BDVP (570W | Voc: 50.86V | Isc: 14.26A | 22.07%)
+* JKM575N-72HL4-BDVP (575W | Voc: 51.05V | Isc: 14.35A | 22.26%)
+* JKM580N-72HL4-BDVP (580W | Voc: 51.24V | Isc: 14.42A | 22.45%)
+* JKM585N-72HL4-BDVP (585W | Voc: 51.44V | Isc: 14.50A | 22.65%)
+* JKM590N-72HL4-BDVP (590W | Voc: 51.63V | Isc: 14.58A | 22.84%)
+* JKM610N-72HL4-BDVP (610W | Voc: 52.38V | Isc: 14.80A | 23.61%)
+
+
+* **Tiger Neo 3.0 / 5.0** *(Nova Geração 2025/2026)*
+* JKM660N-78HL4-V (660W | Voc: 56.20V | Isc: 14.95A | 24.20%)
+* JKM670N-78HL4-V (670W | Voc: 56.60V | Isc: 15.05A | 24.80%)
+
+
+
+
+
+---
+
+* ### **2. Trina Solar** *(Plataforma Vertex de 210mm)*
+
+
+* **Vertex S / Vertex S+** *(Residencial N-Type Dual Glass)*
+* TSM-425NEG9R.28 (425W | Voc: 50.9V | Isc: 10.56A | 21.3%)
+* TSM-430NEG9R.28 (430W | Voc: 51.4V | Isc: 10.59A | 21.5%)
+* TSM-435NEG9R.28 (435W | Voc: 51.8V | Isc: 10.64A | 21.8%)
+* TSM-440NEG9R.28 (440W | Voc: 52.2V | Isc: 10.68A | 22.0%)
+* TSM-445NEG9R.28 (445W | Voc: 52.6V | Isc: 10.72A | 22.3%)
+
+
+* **Vertex N** *(Comercial / Células de 210mm)*
+* TSM-565NEG19RC.20 (565W | Voc: 45.0V | Isc: 15.90A | 21.4%)
+* TSM-570NEG19RC.20 (570W | Voc: 45.2V | Isc: 15.98A | 21.6%)
+* TSM-575NEG19RC.20 (575W | Voc: 45.4V | Isc: 16.06A | 21.8%)
+* TSM-580NEG19RC.20 (580W | Voc: 45.6V | Isc: 16.15A | 22.0%)
+* TSM-585NEG19RC.20 (585W | Voc: 45.8V | Isc: 16.23A | 22.2%)
+* TSM-590NEG19RC.20 (590W | Voc: 46.0V | Isc: 16.31A | 22.4%)
+* TSM-690NEG21C.20 (690W | Voc: 48.2V | Isc: 18.10A | 22.2%)
+* TSM-700NEG21C.20 (700W | Voc: 48.6V | Isc: 18.22A | 22.5%)
+
+
+
+
+
+---
+
+* ### **3. Canadian Solar**
+
+
+* **HiKu6 / BiHiKu6** *(P-Type PERC)*
+* CS6W-535MS (535W | Voc: 49.2V | Isc: 13.85A | 20.9%)
+* CS6W-540MS (540W | Voc: 49.4V | Isc: 13.91A | 21.1%)
+* CS6W-545MS (545W | Voc: 49.6V | Isc: 13.98A | 21.3%)
+* CS6W-550MS (550W | Voc: 49.8V | Isc: 14.04A | 21.5%)
+
+
+* **TOPHiKu6 / TOPHiKu7** *(N-Type TOPCon)*
+* CS6W-565T (565W | Voc: 51.1V | Isc: 14.03A | 21.9%)
+* CS6W-570T (570W | Voc: 51.3V | Isc: 14.10A | 22.1%)
+* CS6W-575T (575W | Voc: 51.5V | Isc: 14.17A | 22.3%)
+* CS6W-580T (580W | Voc: 51.7V | Isc: 14.23A | 22.5%)
+* CS6W-585T (585W | Voc: 51.9V | Isc: 14.30A | 22.7%)
+* CS7N-660TB-AG (660W | Voc: 47.9V | Isc: 17.48A | 22.5%)
+* CS7N-670TB-AG (670W | Voc: 48.3V | Isc: 17.58A | 22.8%)
+
+
+
+
+
+---
+
+* ### **4. LONGi Solar** *(Tecnologia HPBC e HIBC)*
+
+
+* **Hi-MO 6** *(Tecnologia HPBC - Contato Traseiro)*
+* LR5-54HPB-425M (425W All Black | Voc: 38.63V | Isc: 13.93A | 21.8%)
+* LR5-54HPB-430M (430W | Voc: 38.83V | Isc: 14.01A | 22.0%)
+* LR5-72HTH-570M (570W | Voc: 51.61V | Isc: 14.05A | 22.1%)
+* LR5-72HTH-580M (580W | Voc: 51.91V | Isc: 14.17A | 22.5%)
+* LR5-72HTH-590M (590W | Voc: 52.21V | Isc: 14.28A | 22.8%)
+
+
+* **Hi-MO 7** *(N-Type TOPCon Bifacial)*
+* LR5-72HGD-575M (575W | Voc: 51.05V | Isc: 14.25A | 22.3%)
+* LR5-72HGD-580M (580W | Voc: 51.25V | Isc: 14.32A | 22.5%)
+* LR5-72HGD-585M (585W | Voc: 51.45V | Isc: 14.39A | 22.7%)
+* LR5-72HGD-590M (590W | Voc: 51.65V | Isc: 14.46A | 22.8%)
+
+
+* **Hi-MO S10 / X10** *(Ultra Eficiência Back-Contact 2025/2026)*
+* LR5-72HIBC-670M (670W | Voc: 53.10V | Isc: 15.10A | 24.8%)
+* LR5-72HIBC-690M (690W | Voc: 53.70V | Isc: 15.25A | 25.5%)
+
+
+
+
+
+---
+
+* ### **5. Tongwei Solar (TW Solar)** *(Gigante em Capacidade)*
+
+
+* **Linha Shingled & N-Type TOPCon**
+* TWMPD-54HS415 (415W | Voc: 37.80V | Isc: 13.88A | 21.3%)
+* TWMND-72HD565 (565W | Voc: 50.80V | Isc: 14.10A | 21.9%)
+* TWMND-72HD575 (575W | Voc: 51.20V | Isc: 14.22A | 22.3%)
+* TWMND-72HD580 (580W | Voc: 51.40V | Isc: 14.29A | 22.5%)
+* TWMND-72HD585 (585W | Voc: 51.60V | Isc: 14.36A | 22.6%)
+
+
+
+
+
+---
+
+* ### **6. Aiko Solar** *(Líder em Eficiência Mundial - ABC All-Back-Contact)*
+
+
+* **Neostar / Comet / Stellar** *(Linha ABC)*
+* AK-A450-MAH54Mb (450W | Voc: 40.20V | Isc: 14.10A | 23.0%)
+* AK-A470-MAH54Mb (470W | Voc: 40.80V | Isc: 14.30A | 24.0%)
+* Comet 3N72-670 (670W | Voc: 53.20V | Isc: 15.10A | 24.8%)
+* Comet 3N72-690 (690W | Voc: 53.80V | Isc: 15.30A | 25.5%)
+
+
+
+
+
+---
+
+* ### **7. JA Solar** *(Linha DeepBlue)*
+
+
+* **DeepBlue 4.0 Pro** *(N-Type TOPCon)*
+* JAM54D40-435/LB (435W | Voc: 38.70V | Isc: 14.15A | 21.8%)
+* JAM72D40-565/GB (565W | Voc: 50.90V | Isc: 14.12A | 21.9%)
+* JAM72D40-570/GB (570W | Voc: 51.10V | Isc: 14.19A | 22.1%)
+* JAM72D40-575/GB (575W | Voc: 51.30V | Isc: 14.26A | 22.3%)
+* JAM72D40-580/GB (580W | Voc: 51.50V | Isc: 14.33A | 22.5%)
+* JAM72D40-585/GB (585W | Voc: 51.70V | Isc: 14.40A | 22.7%)
+
+
+
+
+
+---
+
+* ### **8. Risen Energy** *(Linha Titan & Hyper-Ion HJT)*
+
+
+* **Titan PERC & TOPCon**
+* RSM110-8-550M (550W | Voc: 38.02V | Isc: 18.28A | 21.0%)
+* RSM130-8-440M (440W | Voc: 44.80V | Isc: 12.35A | 21.3%)
+
+
+* **Hyper-Ion HJT** *(Heterojunção - Altíssima Eficiência Térmica)*
+* RSM110-8-680HJT (680W | Voc: 49.30V | Isc: 17.30A | 22.5%)
+* RSM110-8-700HJT (700W | Voc: 49.90V | Isc: 17.55A | 23.2%)
+
+
+
+
+
+---
+
+* ### **9. DAH Solar** *(Módulos Full-Screen / Sem Borda)*
+
+
+* **Full-Screen N-Type TOPCon**
+* DHT-M60X10/FS-455W (455W | Voc: 41.6V | Isc: 13.88A | 21.05%)
+* DHN-72X16/FS-570W (570W | Voc: 51.2V | Isc: 14.12A | 22.07%)
+* DHN-72X16/FS-575W (575W | Voc: 51.4V | Isc: 14.19A | 22.26%)
+* DHN-72X16/FS-580W (580W | Voc: 51.6V | Isc: 14.26A | 22.45%)
+
+
+
+
+
+---
+
+* ### **10. Outras Marcas Tier 1 / Nacionais**
+
+
+* **Astronergy (CHINT Solar)**
+* CHSM72N-HC-575 (575W | N-Type TOPCon)
+* CHSM72N-HC-580 (580W | N-Type TOPCon)
+* CHSM72N-HC-585 (585W | N-Type TOPCon)
+
+
+* **Suntech**
+* STP550S-B72 (550W | Ultra V)
+* STP575S-C72 (575W | Ultra N)
+
+
+* **Hyundai Heavy Industries**
+* HiE-S410VG (410W | Shingled)
+* HiE-S550VI (550W | PERC)
+* HiE-S575VI (575W | N-Type)
+
+
+* **Resun Solar**
+* RS8I-550M (550W | PERC)
+* RS8N-575M (575W | N-Type)
