@@ -16,7 +16,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   let callerUid: string;
   try {
     callerUid = (await adminAuth().verifyIdToken(idToken)).uid;
-  } catch {
+  } catch (err) {
+    console.error("verifyIdToken falhou:", err);
     return NextResponse.json({ error: "Sessão inválida. Faça login de novo." }, { status: 401 });
   }
 

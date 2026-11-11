@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
     callerUid = decoded.uid;
-  } catch {
+  } catch (err) {
+    console.error("verifyIdToken falhou:", err);
     return NextResponse.json({ error: "Sessão inválida. Faça login de novo." }, { status: 401 });
   }
 
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ id: created.uid, nome, email, iniciais: iniciaisDe(nome), cargoId, funcao });
   } catch (err) {
+    console.error("Erro ao criar usuário:", err);
     const code = (err as { errorInfo?: { code?: string } })?.errorInfo?.code;
     const message =
       code === "auth/email-already-exists"

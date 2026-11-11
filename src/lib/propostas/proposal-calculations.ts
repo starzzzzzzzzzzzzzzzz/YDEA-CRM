@@ -139,7 +139,10 @@ export function geracaoPorMes(geracaoAnualKwh: number, ano: number): number[] {
 
 // --- Precificação -------------------------------------------------------------
 
-/** Mão de obra de instalação = R$ 80,00 × quantidade de módulos. */
+/** Mão de obra de instalação = R$ 80,00 × quantidade de módulos. a base, dependendo de região para 
+ * região ai sim vai ser um valor diferente, se for muitas placas diminui o valor, ou se for na região onde a empresa reside sai mais barato 70 reais
+ * 
+*/
 export function maoDeObraInstalacao(qtdModulos: number): number {
   return round2(MAO_DE_OBRA_POR_MODULO * qtdModulos);   
 }
