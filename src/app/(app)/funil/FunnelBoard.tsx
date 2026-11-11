@@ -12,8 +12,11 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus, Filter, LayoutGrid, List, Download, Info, X, CalendarCheck2, CalendarX2 } from "lucide-react";
-import { Deal, FunnelId } from "@/lib/types";
+import {
+  Plus, Filter, LayoutGrid, List, Download, Info, X, CalendarCheck2, CalendarX2,
+  CalendarClock, Clock, Flame, Snowflake, Thermometer, User2, Zap,
+} from "lucide-react";
+import { Deal, FunnelId, Temperatura, PERFIL_CLIENTE_LABEL, TEMPERATURA_LABEL } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { hasPermission } from "@/lib/db/permissoes";
@@ -68,6 +71,46 @@ const PRIORIDADE_ACCENT: Record<string, string> = {
   alta: "bg-red-500",
 };
 
+const TEMPERATURA_CHIP: Record<Temperatura, { Icone: typeof Flame; classe: string }> = {
+  frio: { Icone: Snowflake, classe: "bg-badge-blue-bg text-badge-blue-text" },
+  morno: { Icone: Thermometer, classe: "bg-badge-amber-bg text-badge-amber-text" },
+  quente: { Icone: Flame, classe: "bg-badge-red-bg text-badge-red-text" },
+};
+
+/** Dias inteiros desde uma data ISO ("2026-10-06" ou com hora). null se não der para ler. */
+function diasDesde(iso?: string): number | null {
+  if (!iso) return null;
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso);
+  if (isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
+}
+
+/** Há quantos dias o negócio está na etapa atual (usa o histórico; sem ele, a data de criação). */
+function diasNaEtapa(deal: Deal): number | null {
+  const ultima = [...(deal.historicoEtapas ?? [])].reverse().find((h) => h.stageId === deal.stageId);
+  return diasDesde(ultima?.em ?? deal.createdAt);
+}
+
+function textoDias(n: number) {
+  if (n === 0) return "hoje";
+  if (n < 60) return `${n} d`;
+  return `${Math.floor(n / 30)} meses`;
+}
+
+/** "2026-11-20" -> "20/11". */
+function diaMes(iso?: string) {
+  const m = iso?.match(/^\d{4}-(\d{2})-(\d{2})/);
+  return m ? `${m[2]}/${m[1]}` : "";
+}
+
+function iniciais(nome: string) {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return "?";
+  const primeira = partes[0][0];
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase();
+}
+
 function DealCard({
   deal,
   dragging,
@@ -89,12 +132,37 @@ function DealCard({
     : undefined;
   const subtitulo = getOrganizacao(deal.organizacaoId)?.nome ?? getPessoa(deal.pessoaId)?.nome;
 
+  const status = deal.status ?? "aberto";
+  const aberto = status === "aberto";
   const accentColor =
-    deal.status === "ganho"
+    status === "ganho"
       ? "bg-badge-green-text"
-      : deal.status === "perdido"
+      : status === "perdido"
       ? "bg-badge-red-text"
       : PRIORIDADE_ACCENT[deal.prioridade ?? "media"] ?? PRIORIDADE_ACCENT.media;
+
+  const temp = deal.temperatura ? TEMPERATURA_CHIP[deal.temperatura] : null;
+  const potencia = deal.potenciaSistema
+    ? `${deal.potenciaSistema.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kWp`
+    : "";
+  const perfil = deal.perfilCliente ? PERFIL_CLIENTE_LABEL[deal.perfilCliente] : "";
+  const probabilidade =
+    aberto && typeof deal.probabilidade === "number"
+      ? Math.min(100, Math.max(0, deal.probabilidade))
+      : null;
+
+  // Prazo (negócio aberto) ou data de fechamento (ganho/perdido).
+  const dataPrazo = aberto ? deal.previsaoFechamento : deal.fechadoEm;
+  const hojeIso = new Date().toLocaleDateString("sv-SE");
+  const atrasado = aberto && !!deal.previsaoFechamento && deal.previsaoFechamento.slice(0, 10) < hojeIso;
+
+  // Tempo parado na etapa: só importa para negócio aberto.
+  const parado = aberto ? diasNaEtapa(deal) : null;
+  const paradoClasse =
+    parado === null ? "text-text-faint" : parado >= 30 ? "text-red" : parado >= 14 ? "text-badge-amber-text" : "text-text-faint";
+
+  const responsavel = deal.responsavel?.trim() || "Sem responsável";
+  const semResponsavel = responsavel === "Sem responsável";
 
   return (
     <div
@@ -103,25 +171,123 @@ function DealCard({
       {...listeners}
       {...attributes}
       onClick={() => onOpen?.(deal.id)}
-      className={`group relative overflow-hidden bg-card-bg border border-border-soft rounded-xl pl-4 pr-3.5 py-3 shadow-sm cursor-grab active:cursor-grabbing select-none touch-none transition-all duration-200 ease-out ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onOpen?.(deal.id);
+      }}
+      className={`group relative overflow-hidden bg-card-bg border border-border-soft rounded-xl pl-4 pr-3.5 pt-3 pb-2.5 shadow-sm cursor-grab active:cursor-grabbing select-none touch-none outline-none focus-visible:ring-2 focus-visible:ring-brand transition-all duration-200 ease-out motion-reduce:transition-none ${
         isDragging && !dragging ? "opacity-30" : ""
       } ${
         dragging
           ? "shadow-xl rotate-1 scale-[1.02]"
-          : "hover:border-brand hover:shadow-md hover:-translate-y-0.5"
+          : "hover:border-brand hover:shadow-md hover:-translate-y-0.5 motion-reduce:hover:translate-y-0"
       }`}
     >
       <span className={`absolute left-0 top-0 h-full w-1 ${accentColor} transition-colors`} />
-      <h4 className="font-semibold text-text-dark text-[13px] leading-snug truncate">
-        {deal.titulo}
-      </h4>
-      <p className="text-[11.5px] text-text-faint truncate mt-0.5 mb-2.5 min-h-[15px]">
-        {subtitulo ?? "\u00A0"}
+
+      {/* Título + status */}
+      <div className="flex items-start justify-between gap-2">
+        <h4 className="font-semibold text-text-dark text-[13px] leading-snug line-clamp-2">
+          {deal.titulo}
+        </h4>
+        {!aberto && (
+          <span
+            title={status === "perdido" ? deal.motivoPerda || "Perdido" : "Ganho"}
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+              status === "ganho"
+                ? "bg-badge-green-bg text-badge-green-text"
+                : "bg-badge-red-bg text-badge-red-text"
+            }`}
+          >
+            {status === "ganho" ? "Ganho" : "Perdido"}
+          </span>
+        )}
+      </div>
+      <p className="flex items-center gap-1 text-[11.5px] text-text-faint mt-0.5 min-h-[16px]">
+        {subtitulo ? (
+          <>
+            <User2 size={11} className="shrink-0" />
+            <span className="truncate">{subtitulo}</span>
+          </>
+        ) : (
+          "\u00A0"
+        )}
       </p>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold text-text-dark">
-          {formatBRL(deal.valor)}
+
+      {/* Chips: só aparecem quando o dado existe */}
+      {(temp || potencia || perfil) && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          {temp && deal.temperatura && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${temp.classe}`}>
+              <temp.Icone size={11} strokeWidth={2.25} />
+              {TEMPERATURA_LABEL[deal.temperatura]}
+            </span>
+          )}
+          {potencia && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-panel-bg px-2 py-0.5 text-[10.5px] font-medium text-text-gray">
+              <Zap size={11} strokeWidth={2.25} />
+              {potencia}
+            </span>
+          )}
+          {perfil && (
+            <span className="rounded-full bg-panel-bg px-2 py-0.5 text-[10.5px] font-medium text-text-gray">
+              {perfil}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Valor + probabilidade */}
+      <div className="mt-2.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-display font-bold text-[15px] text-text-dark leading-none">
+            {formatBRL(deal.valor)}
+          </span>
+          {probabilidade !== null && (
+            <span className="text-[11px] font-medium text-text-gray" title="Probabilidade de fechamento">
+              {probabilidade}%
+            </span>
+          )}
+        </div>
+        {probabilidade !== null && (
+          <div className="mt-1.5 h-1 w-full rounded-full bg-panel-bg overflow-hidden">
+            <div className="h-full rounded-full bg-brand" style={{ width: `${probabilidade}%` }} />
+          </div>
+        )}
+      </div>
+
+      {/* Rodapé: responsável, prazo, tempo na etapa, atividade */}
+      <div className="mt-2.5 pt-2 border-t border-border-soft flex items-center gap-2">
+        <span
+          title={responsavel}
+          className={`h-5 w-5 shrink-0 rounded-full flex items-center justify-center text-[9.5px] font-semibold ${
+            semResponsavel ? "bg-panel-bg text-text-faint" : "bg-brand-soft text-brand-strong"
+          }`}
+        >
+          {semResponsavel ? "?" : iniciais(responsavel)}
         </span>
+        <span className="flex-1 min-w-0 truncate text-[11.5px] text-text-gray">
+          {semResponsavel ? "Sem responsável" : responsavel.split(/\s+/)[0]}
+        </span>
+        {dataPrazo && diaMes(dataPrazo) && (
+          <span
+            title={aberto ? (atrasado ? "Previsão de fechamento atrasada" : "Previsão de fechamento") : "Data de fechamento"}
+            className={`inline-flex items-center gap-1 text-[11px] ${
+              atrasado ? "text-red font-semibold" : "text-text-faint"
+            }`}
+          >
+            <CalendarClock size={12} />
+            {diaMes(dataPrazo)}
+          </span>
+        )}
+        {parado !== null && (
+          <span
+            title={`Há ${parado} dia(s) nesta etapa`}
+            className={`inline-flex items-center gap-1 text-[11px] ${paradoClasse}`}
+          >
+            <Clock size={12} />
+            {textoDias(parado)}
+          </span>
+        )}
         <AtividadeIcone temAtividade={temAtividade} />
       </div>
     </div>
@@ -146,10 +312,13 @@ function Column({
 
   return (
     <div className="flex flex-col w-72 shrink-0 border-r border-border-soft last:border-r-0 pr-4 last:pr-0">
-      <div className="px-0.5 mb-3">
-        <h3 className="text-[13px] font-semibold text-text-dark mb-0.5">{label}</h3>
-        <span className="text-[11px] text-text-faint">
-          {deals.length} negócios · {formatBRL(total)}
+      <div className="px-0.5 mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-semibold text-text-dark truncate">{label}</h3>
+          <span className="text-[11px] text-text-faint">{formatBRL(total)}</span>
+        </div>
+        <span className="shrink-0 rounded-full border border-border-soft bg-panel-bg px-2 py-0.5 text-[11px] font-semibold text-text-gray">
+          {deals.length}
         </span>
       </div>
       <div
@@ -166,6 +335,11 @@ function Column({
             onOpen={onOpenDeal}
           />
         ))}
+        {deals.length === 0 && (
+          <div className="flex-1 min-h-[96px] rounded-xl border border-dashed border-border flex items-center justify-center text-[11.5px] text-text-faint">
+            Solte um negócio aqui
+          </div>
+        )}
       </div>
     </div>
   );
