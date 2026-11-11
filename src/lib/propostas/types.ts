@@ -86,6 +86,8 @@ export type PropostaDados = {
 
   // Etapa 2 — Dimensionamento técnico e fatura
   concessionaria: string;
+  /** Subgrupo tarifário da concessionária (define as tarifas buscadas na ANEEL). */
+  perfilConcessionaria: "B1" | "B2" | "B3";
   codigoUC: string;
   fase: FaseRede;
   tensao: string;
@@ -194,4 +196,29 @@ export type PropostaSalva = {
   criadoPorId: string;
   criadoPorNome: string;
   dados: PropostaDados;
+};
+
+/** Equipamentos cadastrados (coleções `catalogo_modulos` e `catalogo_inversores`). */
+export type CatalogoModulo = {
+  id: string;
+  marca: string;
+  modelo: string;
+  potenciaW: number;
+  larguraMm?: number;
+  comprimentoMm?: number;
+  valorUnitario?: number;
+  garantiaDesempenhoAnos?: number;
+  garantiaFabricacaoAnos?: number;
+};
+
+export type CatalogoInversor = {
+  id: string;
+  marca: string;
+  modelo: string;
+  potenciaKw: number;
+  tensaoSaida: string;
+  fase: FaseRede;
+  potenciaMaximaVA?: number;
+  valorUnitario?: number;
+  garantiaFabricacaoAnos?: number;
 };

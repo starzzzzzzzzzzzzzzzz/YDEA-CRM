@@ -1,19 +1,25 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { BookmarkPlus, Plus, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
+import { salvarInversorCatalogo, salvarModuloCatalogo } from "@/lib/firebase/catalogo";
 import { Field, inputClass, inputErrorClass } from "@/components/ui/Field";
+import SearchSelect, { type SearchSelectItem } from "@/components/ui/SearchSelect";
 import { inversorVazio, novoId } from "@/lib/propostas/dados-iniciais";
 import { ALIQUOTA_COMISSAO, ALIQUOTA_IMPOSTO, MAO_DE_OBRA_POR_MODULO, calcularProposta } from "@/lib/propostas/proposal-calculations";
 import { formatarBRL, formatarNumero } from "@/lib/propostas/proposal-text";
 import { TENSOES_REDE } from "@/lib/propostas/constants";
 import { FASE_LABEL, type FaseRede, type InversorKit } from "@/lib/propostas/types";
 import { EtapaProps, MoedaInput, NumeroInput, Resumo, Secao } from "../ui";
+import { useCatalogo } from "../useCatalogo";
 
 const btnSec =
   "flex items-center gap-1.5 rounded-lg border border-border text-text-gray font-semibold text-[13px] px-3 py-1.5 hover:bg-panel-bg transition-colors";
 
 export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
   const r = calcularProposta(dados);
+  const { showToast } = useToast();
+  const { modulos: catModulos, inversores: catInversores, recarregar } = useCatalogo();
   const cls = (campo: string) => `${inputClass} ${erros[campo] ? inputErrorClass : ""}`;
 
   function setModulo<K extends keyof typeof dados.modulo>(campo: K, valor: (typeof dados.modulo)[K]) {
@@ -21,6 +27,87 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
   }
   function setInversor(id: string, patch: Partial<InversorKit>) {
     set("inversores", dados.inversores.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
+
+  const itensModulos: SearchSelectItem[] = catModulos.map((m) => ({
+    id: m.id,
+    label: `${m.marca} ${m.modelo}`,
+    sublabel: `${formatarNumero(m.potenciaW, 0)} W${m.larguraMm && m.comprimentoMm ? ` · ${m.larguraMm}×${m.comprimentoMm} mm` : ""}`,
+  }));
+  const itensInversores: SearchSelectItem[] = catInversores.map((i) => ({
+    id: i.id,
+    label: `${i.marca} ${i.modelo}`,
+    sublabel: `${formatarNumero(i.potenciaKw)} kW · ${i.tensaoSaida} · ${FASE_LABEL[i.fase]}`,
+  }));
+  const catalogoVazio = "Catálogo vazio. Cadastre em Propostas → Catálogo de equipamentos.";
+
+  /** Escolheu um módulo da lista → preenche marca, potência, dimensões, garantias e valor. */
+  function aplicarModulo(id: string) {
+    const achado = catModulos.find((m) => m.id === id);
+    if (!achado) return;
+    set("modulo", {
+      ...dados.modulo,
+      marca: achado.marca,
+      modelo: achado.modelo,
+      potenciaW: achado.potenciaW,
+      larguraMm: achado.larguraMm,
+      comprimentoMm: achado.comprimentoMm,
+      valorUnitario: achado.valorUnitario ?? dados.modulo.valorUnitario,
+      garantiaDesempenhoAnos: achado.garantiaDesempenhoAnos,
+      garantiaFabricacaoAnos: achado.garantiaFabricacaoAnos,
+    });
+  }
+
+  function aplicarInversor(invId: string, catId: string) {
+    const achado = catInversores.find((i) => i.id === catId);
+    if (!achado) return;
+    setInversor(invId, {
+      marca: achado.marca,
+      modelo: achado.modelo,
+      potenciaKw: achado.potenciaKw,
+      tensaoSaida: achado.tensaoSaida,
+      fase: achado.fase,
+      potenciaMaximaVA: achado.potenciaMaximaVA,
+      valorUnitario: achado.valorUnitario ?? dados.inversores.find((i) => i.id === invId)?.valorUnitario ?? 0,
+      garantiaFabricacaoAnos: achado.garantiaFabricacaoAnos,
+    });
+  }
+
+  async function salvarModuloNoCatalogo() {
+    const m = dados.modulo;
+    if (!m.marca.trim() || !m.modelo.trim() || !(m.potenciaW > 0)) {
+      showToast("Preencha marca, modelo e potência do módulo", "error");
+      return;
+    }
+    try {
+      await salvarModuloCatalogo({
+        marca: m.marca.trim(), modelo: m.modelo.trim(), potenciaW: m.potenciaW,
+        larguraMm: m.larguraMm, comprimentoMm: m.comprimentoMm, valorUnitario: m.valorUnitario || undefined,
+        garantiaDesempenhoAnos: m.garantiaDesempenhoAnos, garantiaFabricacaoAnos: m.garantiaFabricacaoAnos,
+      });
+      await recarregar();
+      showToast("Módulo salvo no catálogo");
+    } catch {
+      showToast("Erro ao salvar no catálogo", "error");
+    }
+  }
+
+  async function salvarInversorNoCatalogo(inv: InversorKit) {
+    if (!inv.marca.trim() || !inv.modelo.trim() || !(inv.potenciaKw > 0)) {
+      showToast("Preencha marca, modelo e potência do inversor", "error");
+      return;
+    }
+    try {
+      await salvarInversorCatalogo({
+        marca: inv.marca.trim(), modelo: inv.modelo.trim(), potenciaKw: inv.potenciaKw, tensaoSaida: inv.tensaoSaida,
+        fase: inv.fase, potenciaMaximaVA: inv.potenciaMaximaVA, valorUnitario: inv.valorUnitario || undefined,
+        garantiaFabricacaoAnos: inv.garantiaFabricacaoAnos,
+      });
+      await recarregar();
+      showToast("Inversor salvo no catálogo");
+    } catch {
+      showToast("Erro ao salvar no catálogo", "error");
+    }
   }
 
   return (
@@ -56,6 +143,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
       </Secao>
 
       <Secao titulo="Módulo" subtitulo={`Quantidade sugerida pelo dimensionamento: ${r.quantidadeModulosCalculada}`}>
+        <Field label="Escolher do catálogo" hint={catModulos.length ? `${catModulos.length} módulo(s) cadastrado(s). Escolher preenche os campos abaixo.` : catalogoVazio}>
+          <SearchSelect items={itensModulos} value={null} onChange={(i) => i && aplicarModulo(i.id)} placeholder="Clique para ver os módulos ou busque por marca, modelo ou potência..." emptyHint={catalogoVazio} />
+        </Field>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Marca do módulo" required error={erros.moduloMarca}>
             <input className={cls("moduloMarca")} value={dados.modulo.marca} onChange={(e) => setModulo("marca", e.target.value)} />
@@ -85,6 +175,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
             <NumeroInput value={dados.modulo.garantiaFabricacaoAnos ?? 0} onChange={(n) => setModulo("garantiaFabricacaoAnos", n || undefined)} />
           </Field>
         </div>
+        <button type="button" className={btnSec} onClick={salvarModuloNoCatalogo}>
+          <BookmarkPlus size={14} /> Salvar este módulo no catálogo
+        </button>
       </Secao>
 
       <Secao titulo="Inversores" subtitulo={erros.inversores}>
@@ -98,6 +191,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
                 </button>
               )}
             </div>
+            <Field label="Escolher do catálogo" hint={catInversores.length ? `${catInversores.length} inversor(es) cadastrado(s). Escolher preenche os campos abaixo.` : catalogoVazio}>
+              <SearchSelect items={itensInversores} value={null} onChange={(i) => i && aplicarInversor(inv.id, i.id)} placeholder="Clique para ver os inversores ou busque por marca, modelo ou potência..." emptyHint={catalogoVazio} />
+            </Field>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="Marca do inversor" required>
                 <input className={inputClass} value={inv.marca} onChange={(e) => setInversor(inv.id, { marca: e.target.value })} />
@@ -137,6 +233,9 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
                 <NumeroInput value={inv.garantiaFabricacaoAnos ?? 0} onChange={(n) => setInversor(inv.id, { garantiaFabricacaoAnos: n || undefined })} />
               </Field>
             </div>
+            <button type="button" className="text-[12px] text-brand-strong hover:underline" onClick={() => salvarInversorNoCatalogo(inv)}>
+              Salvar este inversor no catálogo
+            </button>
           </div>
         ))}
         <button type="button" className={btnSec} onClick={() => set("inversores", [...dados.inversores, inversorVazio()])}>

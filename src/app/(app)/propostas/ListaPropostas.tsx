@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FilePlus2 } from "lucide-react";
+import { BookOpen, FilePlus2 } from "lucide-react";
 import { fetchPropostas } from "@/lib/firebase/propostas";
 import { formatarBRL, formatarNumero } from "@/lib/propostas/proposal-text";
 import type { PropostaSalva } from "@/lib/propostas/types";
@@ -28,12 +28,20 @@ export default function ListaPropostas({ dealId }: { dealId?: string }) {
     <div className="max-w-[1200px] mx-auto">
       <div className="flex items-center justify-between mb-5">
         <h1 className="font-display font-semibold text-xl text-text-dark">Propostas</h1>
+        <div className="flex items-center gap-2">
+        <Link
+          href="/propostas/catalogo"
+          className="flex items-center gap-1.5 rounded-lg border border-border text-text-gray font-semibold text-sm px-3.5 py-2 hover:bg-panel-bg transition-colors"
+        >
+          <BookOpen size={15} /> Catálogo de equipamentos
+        </Link>
         <Link
           href="/propostas/nova"
           className="flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-semibold text-sm px-3.5 py-2 hover:bg-brand-strong transition-colors"
         >
           <FilePlus2 size={15} /> Nova proposta
         </Link>
+        </div>
       </div>
 
       <div className="bg-card-bg border border-border rounded-xl overflow-hidden">

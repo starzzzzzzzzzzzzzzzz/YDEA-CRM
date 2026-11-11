@@ -22,7 +22,23 @@ export const TIPOS_ESTRUTURA = [
   "Telhado Fibromadeira",
 ];
 
+import type { FaseRede } from "./types";
+
 export const TENSOES_REDE = ["V127", "V220", "V380"];
+
+/** Tensões possíveis em cada fase da rede. */
+export const TENSOES_POR_FASE: Record<FaseRede, string[]> = {
+  monofasico: ["V127", "V220"],
+  bifasico: ["V220"],
+  trifasico: ["V220", "V380"],
+};
+
+/** Tensão que o sistema escolhe sozinho ao trocar a fase (ajuste aqui se a rede de vocês for outra). */
+export const TENSAO_PADRAO_POR_FASE: Record<FaseRede, string> = {
+  monofasico: "V220",
+  bifasico: "V220",
+  trifasico: "V380",
+};
 
 export const ESTADOS_BR = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
