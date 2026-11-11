@@ -54,6 +54,8 @@ import { quandoTexto } from "@/lib/atividades";
 import { fetchDocumentos } from "@/lib/firebase/documentos";
 import { fetchAllUsuarios, UsuarioDoc } from "@/lib/firebase/firestore";
 import DocumentUploadGrid from "./DocumentUploadGrid";
+import EditableCard, { RowSpec } from "./EditableCard";
+import { CANAIS_ORIGEM } from "@/lib/constants";
 
 function diasDesde(dateStr?: string) {
   if (!dateStr) return null;
@@ -70,15 +72,6 @@ function formatDateTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 py-2 text-[13px] border-b border-border-soft last:border-b-0">
-      <span className="text-text-faint shrink-0">{label}</span>
-      <span className="text-text-dark font-medium text-right">{value ?? "—"}</span>
-    </div>
-  );
 }
 
 function SidebarCard({
@@ -320,30 +313,141 @@ export default function DealDetailPanel({
     }
   }
 
-  const customFields: { label: string; value?: React.ReactNode }[] = [
+  async function handleSalvarCampos(patch: Partial<Deal>) {
+    // Mudar a etapa passa pelo updateDeal, que também registra o histórico de etapas.
+    updateDeal(deal!.id, patch);
+    showToast("Informações atualizadas");
+  }
+
+  const fmtData = (iso?: string) => (iso ? iso.split("-").reverse().join("/") : undefined);
+
+  const negocioRows: RowSpec[] = [
+    { kind: "field", key: "valor", label: "Valor", type: "currency", required: true, display: (d) => formatBRL(d.valor) },
+    { kind: "field", key: "titulo", label: "Nome", type: "text", required: true },
     {
+      kind: "field",
+      key: "previsaoFechamento",
+      label: "Previsão de fechamento",
+      type: "date",
+      display: (d) => fmtData(d.previsaoFechamento),
+    },
+    { kind: "readonly", label: "Funil", value: funnel?.name },
+    {
+      kind: "field",
+      key: "stageId",
+      label: "Etapa do funil",
+      type: "select",
+      required: true,
+      options: (funnel?.stages ?? []).map((st) => ({ value: st.id, label: st.label })),
+    },
+    {
+      kind: "readonly",
+      label: "Organização",
+      value: organizacao ? (
+        <span className="inline-flex items-center gap-1 text-brand-strong">
+          <Building2 size={12} />
+          {organizacao.nome}
+        </span>
+      ) : undefined,
+    },
+    {
+      kind: "readonly",
+      label: "Pessoa de contato",
+      value: pessoa ? (
+        <span className="inline-flex items-center gap-1 text-brand-strong">
+          <User2 size={12} />
+          {pessoa.nome}
+        </span>
+      ) : undefined,
+    },
+    { kind: "readonly", label: "Responsável", value: deal.responsavel },
+    {
+      kind: "readonly",
+      label: "Idade do negócio",
+      value: idade !== null ? `${idade} dia${idade !== 1 ? "s" : ""}` : undefined,
+    },
+    { kind: "readonly", label: "Data de início", value: deal.createdAt },
+    {
+      kind: "field",
+      key: "canalOrigem",
+      label: "Canal de origem",
+      type: "select",
+      options: CANAIS_ORIGEM.map((c) => ({ value: c, label: c })),
+    },
+    {
+      kind: "field",
+      key: "temperatura",
+      label: "Temperatura",
+      type: "select",
+      options: (Object.keys(TEMPERATURA_LABEL) as (keyof typeof TEMPERATURA_LABEL)[]).map((t) => ({
+        value: t,
+        label: TEMPERATURA_LABEL[t],
+      })),
+    },
+    ...(deal.status === "perdido" && deal.motivoPerda
+      ? ([{ kind: "readonly", label: "Motivo da perda", value: deal.motivoPerda }] as RowSpec[])
+      : []),
+  ];
+
+  const customRows: RowSpec[] = [
+    {
+      kind: "field",
+      key: "perfilCliente",
       label: "Perfil do cliente",
-      value: deal.perfilCliente ? PERFIL_CLIENTE_LABEL[deal.perfilCliente] : undefined,
+      type: "select",
+      options: (Object.keys(PERFIL_CLIENTE_LABEL) as (keyof typeof PERFIL_CLIENTE_LABEL)[]).map((k) => ({
+        value: k,
+        label: PERFIL_CLIENTE_LABEL[k],
+      })),
     },
     {
+      kind: "field",
+      key: "prioridade",
       label: "Prioridade de instalação",
-      value: deal.prioridade ? deal.prioridade[0].toUpperCase() + deal.prioridade.slice(1) : undefined,
+      type: "select",
+      options: [
+        { value: "baixa", label: "Baixa" },
+        { value: "media", label: "Média" },
+        { value: "alta", label: "Alta" },
+      ],
     },
-    { label: "Tipo de telhado", value: deal.tipoTelhado },
-    { label: "Concessionária", value: deal.concessionaria },
-    { label: "Fase da rede", value: deal.fase },
-    { label: "Consumo médio de energia (kWh)", value: deal.consumoMedio },
-    { label: "Potência do sistema (kWp)", value: deal.potenciaSistema },
-    { label: "Tensão da rede", value: deal.tensao },
-    { label: "Validade da proposta", value: deal.validadeProposta },
-    { label: "Drone", value: deal.drone ? "Sim" : undefined },
-    { label: "Conta Contrato", value: deal.contaContrato },
-    { label: "Carga instalada", value: deal.cargaInstalada },
-    { label: "Troca de titularidade", value: deal.trocaTitularidade ? "Sim" : undefined },
-    { label: "Valor do Projeto", value: deal.valorProjeto ? formatBRL(deal.valorProjeto) : undefined },
-    { label: "NPS Venda", value: deal.npsVenda },
-    { label: "NPS Instalação", value: deal.npsInstalacao },
-    { label: "NPS Pós-venda", value: deal.npsPosVenda },
+    { kind: "field", key: "tipoTelhado", label: "Tipo de telhado", type: "text", placeholder: "Cerâmico, metálico, laje..." },
+    { kind: "field", key: "concessionaria", label: "Concessionária", type: "text" },
+    {
+      kind: "field",
+      key: "fase",
+      label: "Fase da rede",
+      type: "select",
+      options: [
+        { value: "mono", label: "Monofásica" },
+        { value: "bi", label: "Bifásica" },
+        { value: "tri", label: "Trifásica" },
+      ],
+    },
+    { kind: "field", key: "consumoMedio", label: "Consumo médio de energia (kWh)", type: "number" },
+    { kind: "field", key: "potenciaSistema", label: "Potência do sistema (kWp)", type: "number" },
+    { kind: "field", key: "tensao", label: "Tensão da rede", type: "text", placeholder: "127V, 220V..." },
+    {
+      kind: "field",
+      key: "validadeProposta",
+      label: "Validade da proposta",
+      type: "date",
+      display: (d) => fmtData(d.validadeProposta),
+    },
+    { kind: "field", key: "drone", label: "Drone", type: "bool" },
+    { kind: "field", key: "contaContrato", label: "Conta Contrato", type: "text" },
+    { kind: "field", key: "cargaInstalada", label: "Carga instalada", type: "number" },
+    { kind: "field", key: "trocaTitularidade", label: "Troca de titularidade", type: "bool" },
+    {
+      kind: "field",
+      key: "valorProjeto",
+      label: "Valor do Projeto",
+      type: "currency",
+      display: (d) => (d.valorProjeto ? formatBRL(d.valorProjeto) : undefined),
+    },
+    { kind: "field", key: "npsVenda", label: "NPS Venda", type: "number" },
+    { kind: "field", key: "npsInstalacao", label: "NPS Instalação", type: "number" },
+    { kind: "field", key: "npsPosVenda", label: "NPS Pós-venda", type: "number" },
   ];
 
   return (
@@ -574,46 +678,7 @@ export default function DealDetailPanel({
 
           {showInfoCliente && (
             <>
-              <SidebarCard title="Negócio" action={<Pencil size={13} className="text-text-faint" />}>
-                <InfoRow label="Valor" value={formatBRL(deal.valor)} />
-                <InfoRow label="Nome" value={deal.titulo} />
-                <InfoRow label="Previsão de fechamento" value={deal.previsaoFechamento} />
-                <InfoRow label="Funil" value={funnel?.name} />
-                <InfoRow label="Etapa do funil" value={funnel?.stages[currentStageIndex]?.label} />
-                <InfoRow
-                  label="Organização"
-                  value={
-                    organizacao ? (
-                      <span className="inline-flex items-center gap-1 text-brand-strong">
-                        <Building2 size={12} />
-                        {organizacao.nome}
-                      </span>
-                    ) : undefined
-                  }
-                />
-                <InfoRow
-                  label="Pessoa de contato"
-                  value={
-                    pessoa ? (
-                      <span className="inline-flex items-center gap-1 text-brand-strong">
-                        <User2 size={12} />
-                        {pessoa.nome}
-                      </span>
-                    ) : undefined
-                  }
-                />
-                <InfoRow label="Responsável" value={deal.responsavel} />
-                <InfoRow
-                  label="Idade do negócio"
-                  value={idade !== null ? `${idade} dia${idade !== 1 ? "s" : ""}` : undefined}
-                />
-                <InfoRow label="Data de início" value={deal.createdAt} />
-                <InfoRow label="Canal de origem" value={deal.canalOrigem} />
-                {deal.temperatura && <InfoRow label="Temperatura" value={TEMPERATURA_LABEL[deal.temperatura]} />}
-                {deal.status === "perdido" && deal.motivoPerda && (
-                  <InfoRow label="Motivo da perda" value={deal.motivoPerda} />
-                )}
-              </SidebarCard>
+              <EditableCard title="Negócio" deal={deal} rows={negocioRows} onSave={handleSalvarCampos} />
 
               <SidebarCard title="Financiamento">
                 <button
@@ -625,14 +690,14 @@ export default function DealDetailPanel({
                 </button>
               </SidebarCard>
 
-              <SidebarCard title="Personalizados" action={<SlidersHorizontal size={13} className="text-text-faint" />}>
-                <p className="text-[11px] font-semibold text-text-faint uppercase tracking-wide mb-1">
-                  Campos sem grupo
-                </p>
-                {customFields.map((f) => (
-                  <InfoRow key={f.label} label={f.label} value={f.value} />
-                ))}
-              </SidebarCard>
+              <EditableCard
+                title="Personalizados"
+                subtitle="Campos sem grupo"
+                deal={deal}
+                rows={customRows}
+                onSave={handleSalvarCampos}
+                headerIcon={<SlidersHorizontal size={13} />}
+              />
 
               <SidebarCard
                 title="Documentos e fotos"

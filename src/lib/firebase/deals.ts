@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -97,7 +98,13 @@ export async function updateDealDoc(id: string, patch: Partial<Deal>): Promise<v
   // Anexos vivem na subcoleção deals/{id}/documentos — nunca no documento principal.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { documentos, ...resto } = patch;
-  await updateDoc(doc(db, COLLECTION, id), stripUndefined(resto));
+  // Campo explicitamente `undefined` = a pessoa limpou o valor: apaga o campo no Firestore
+  // (o stripUndefined sozinho só ignoraria a chave e o valor antigo voltaria ao recarregar).
+  const dados: Record<string, unknown> = {};
+  for (const [chave, valor] of Object.entries(resto)) {
+    dados[chave] = valor === undefined ? deleteField() : valor;
+  }
+  await updateDoc(doc(db, COLLECTION, id), dados);
 }
 
 export async function deleteDeal(id: string): Promise<void> {

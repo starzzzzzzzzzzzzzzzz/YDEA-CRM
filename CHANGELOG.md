@@ -4,6 +4,19 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v21 — Campos do negócio editáveis (cards "Negócio" e "Personalizados")
+
+No painel do negócio, os cards **Negócio** e **Personalizados** eram só leitura (o lápis era decorativo). Agora o lápis de cada card liga o modo de edição, com **Salvar** e **Cancelar**.
+
+- **Negócio:** valor, nome, previsão de fechamento, etapa do funil (registra no histórico de etapas), canal de origem e temperatura. Funil, organização, pessoa de contato, idade e data de início continuam só leitura; o responsável se troca no topo do painel.
+- **Personalizados:** perfil do cliente, prioridade, tipo de telhado, concessionária, fase da rede, consumo médio, potência do sistema, tensão, validade da proposta, drone, conta contrato, carga instalada, troca de titularidade, valor do projeto e os três NPS.
+- **Limpar um campo apaga de verdade no Firestore** (`updateDealDoc` passou a usar `deleteField()` para valores vazios; antes a chave era ignorada e o valor antigo voltava ao recarregar).
+- Fase da rede agora aparece como Monofásica/Bifásica/Trifásica em vez de `mono`/`bi`/`tri`; datas aparecem como dd/mm/aaaa.
+
+**Arquivos:** `src/app/(app)/funil/EditableCard.tsx` (novo), `DealDetailPanel.tsx`, `src/lib/firebase/deals.ts`.
+
+---
+
 ## v20 — Gerador de propostas (proposta comercial, contrato e OS)
 
 **Novo menu "Propostas"** (permissão `menu.propostas`: admin, vendedor e projetista) com a lista de propostas e o wizard de criação, aberto por três caminhos: botão **Gerar proposta** do negócio, **Criar + Gerar Proposta** no novo negócio e **Nova proposta** na ficha do cliente. Negócio e cliente já preenchem o que existe (cliente, UC, fase, consumo, consultor, endereço da filial).
