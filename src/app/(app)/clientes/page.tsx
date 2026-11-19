@@ -6,10 +6,11 @@ import { Plus, Search, Users } from "lucide-react";
 import { STATUS_LABEL, TEMPERATURA_LABEL, CLIENTE_STATUS_STYLE } from "@/lib/types";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useState } from "react";
+import { dealsDoCliente, situacaoDoCliente, SITUACAO_LABEL, SITUACAO_STYLE } from "@/lib/clienteDeals";
 
 export default function ClientesPage() {
   const router = useRouter();
-  const { clientes, clientesLoading } = useCrmData();
+  const { clientes, clientesLoading, deals, getOrganizacao, getPessoa } = useCrmData();
   const [busca, setBusca] = useState("");
 
   const filtrados = clientes.filter(
@@ -127,11 +128,20 @@ export default function ClientesPage() {
                     {TEMPERATURA_LABEL[c.temperatura]}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span
-                      className={`text-[11px] font-medium px-2 py-1 rounded-md ${CLIENTE_STATUS_STYLE[c.status]}`}
-                    >
-                      {STATUS_LABEL[c.status]}
-                    </span>
+                    {(() => {
+                      const sit = situacaoDoCliente(dealsDoCliente(c, deals, getOrganizacao, getPessoa));
+                      return sit === "ganho" || sit === "perdido" ? (
+                        <span className={`text-[11px] font-medium px-2 py-1 rounded-md ${SITUACAO_STYLE[sit]}`}>
+                          {SITUACAO_LABEL[sit]}
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[11px] font-medium px-2 py-1 rounded-md ${CLIENTE_STATUS_STYLE[c.status]}`}
+                        >
+                          {STATUS_LABEL[c.status]}
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}

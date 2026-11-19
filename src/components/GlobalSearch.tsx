@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { Search, BookUser, Contact, Filter, X } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { FUNNELS } from "@/lib/funnels";
+import { DealStatus } from "@/lib/types";
+import { dealsDoCliente, situacaoDoCliente, SITUACAO_LABEL, SITUACAO_STYLE } from "@/lib/clienteDeals";
 
 type Resultado = {
   key: string;
   tipo: "Cliente" | "Lead" | "Negócio";
   titulo: string;
   detalhe: string;
+  /** Ganho/Perdido/Em andamento — mostrado como selo no resultado. */
+  situacao?: DealStatus;
   onSelect: () => void;
 };
 
@@ -73,6 +77,7 @@ export default function GlobalSearch() {
         tipo: "Cliente" as const,
         titulo: c.nome,
         detalhe: [c.codigo, c.cidade && c.cidade !== "—" ? c.cidade : ""].filter(Boolean).join(" · "),
+        situacao: situacaoDoCliente(dealsDoCliente(c, deals, getOrganizacao, getPessoa)),
         onSelect: () => router.push(`/clientes/${c.id}`),
       }));
 
@@ -105,6 +110,7 @@ export default function GlobalSearch() {
           tipo: "Negócio" as const,
           titulo: d.titulo,
           detalhe: [funil?.name, etapa?.label].filter(Boolean).join(" · "),
+          situacao: d.status ?? "aberto",
           onSelect: () => abrirNegocio(d.id),
         };
       });
@@ -198,6 +204,13 @@ export default function GlobalSearch() {
                     <p className="text-[13px] font-medium text-text-dark truncate">{r.titulo}</p>
                     {r.detalhe && <p className="text-[11px] text-text-faint truncate">{r.detalhe}</p>}
                   </div>
+                  {r.situacao && r.situacao !== "aberto" && (
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${SITUACAO_STYLE[r.situacao]}`}
+                    >
+                      {SITUACAO_LABEL[r.situacao]}
+                    </span>
+                  )}
                   <span className="text-[10.5px] font-semibold uppercase tracking-wide text-text-faint shrink-0">
                     {r.tipo}
                   </span>
