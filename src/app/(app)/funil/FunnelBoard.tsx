@@ -363,6 +363,8 @@ export default function FunnelBoard() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
+  // Aba do funil: negócios em andamento, ganhos ou perdidos.
+  const [aba, setAba] = useState<"aberto" | "ganho" | "perdido">("aberto");
   const [atividadesStatus, setAtividadesStatus] = useState<Record<string, boolean>>({});
 
   // Abrir um negócio registra um passo no histórico do navegador, para que o
@@ -419,7 +421,7 @@ export default function FunnelBoard() {
   const totalsById = useMemo(() => {
     const result: Record<string, { count: number; total: number }> = {};
     FUNNELS.forEach((f) => {
-      const list = deals.filter((d) => d.funnelId === f.id);
+      const list = deals.filter((d) => d.funnelId === f.id && (d.status ?? "aberto") === "aberto");
       result[f.id] = {
         count: list.length,
         total: list.reduce((sum, d) => sum + d.valor, 0),
@@ -429,6 +431,14 @@ export default function FunnelBoard() {
   }, [deals]);
 
   const currentDeals = deals.filter((d) => d.funnelId === funnelId);
+  const contagemAbas = useMemo(() => {
+    const c = { aberto: 0, ganho: 0, perdido: 0 };
+    currentDeals.forEach((d) => {
+      c[d.status ?? "aberto"]++;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deals, funnelId]);
   const activeDeal = deals.find((d) => d.id === activeId);
 
   const responsaveis = useMemo(
@@ -438,10 +448,12 @@ export default function FunnelBoard() {
 
   const dealsFiltrados = useMemo(
     () =>
-      filtroResponsavel === "todos"
-        ? currentDeals
-        : currentDeals.filter((d) => d.responsavel === filtroResponsavel),
-    [currentDeals, filtroResponsavel]
+      currentDeals.filter(
+        (d) =>
+          (d.status ?? "aberto") === aba &&
+          (filtroResponsavel === "todos" || d.responsavel === filtroResponsavel)
+      ),
+    [currentDeals, filtroResponsavel, aba]
   );
 
   const dealsByStageFiltrado = useMemo(() => {
@@ -619,7 +631,39 @@ export default function FunnelBoard() {
         </div>
       </div>
 
-      <div className="border-b border-border mb-5" />
+      <div className="flex items-center gap-1 border-b border-border mb-5">
+        {(
+          [
+            { id: "aberto", label: "Em andamento" },
+            { id: "ganho", label: "Ganhos" },
+            { id: "perdido", label: "Perdidos" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAba(t.id)}
+            className={`-mb-px flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              aba === t.id
+                ? "border-brand text-text-dark"
+                : "border-transparent text-text-faint hover:text-text-gray"
+            }`}
+          >
+            {t.label}
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                t.id === "ganho"
+                  ? "bg-badge-green-bg text-badge-green-text"
+                  : t.id === "perdido"
+                  ? "bg-badge-red-bg text-badge-red-text"
+                  : "bg-panel-bg text-text-gray"
+              }`}
+            >
+              {contagemAbas[t.id]}
+            </span>
+          </button>
+        ))}
+      </div>
 
       {dealsLoading ? (
         <div className="flex gap-4 overflow-hidden">
@@ -641,7 +685,7 @@ export default function FunnelBoard() {
             </div>
           ))}
         </div>
-      ) : viewMode === "list" ? (
+      ) : viewMode === "list" || aba !== "aberto" ? (
         <div className="rounded-xl border border-border overflow-hidden bg-card-bg">
           <table className="w-full text-sm">
             <thead>
@@ -650,6 +694,8 @@ export default function FunnelBoard() {
                 <th className="px-5 py-3 font-semibold">Etapa</th>
                 <th className="px-5 py-3 font-semibold">Responsável</th>
                 <th className="px-5 py-3 font-semibold">Valor</th>
+                {aba !== "aberto" && <th className="px-5 py-3 font-semibold">Situação</th>}
+                {aba === "perdido" && <th className="px-5 py-3 font-semibold">Motivo</th>}
                 <th className="px-5 py-3 font-semibold">Atividade</th>
               </tr>
             </thead>
@@ -669,6 +715,23 @@ export default function FunnelBoard() {
                     <td className="px-5 py-3.5 font-mono font-semibold text-text-dark">
                       {formatBRL(deal.valor)}
                     </td>
+                    {aba !== "aberto" && (
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                            deal.status === "ganho"
+                              ? "bg-badge-green-bg text-badge-green-text"
+                              : "bg-badge-red-bg text-badge-red-text"
+                          }`}
+                        >
+                          {deal.status === "ganho" ? "Ganho" : "Perdido"}
+                          {diaMes(deal.fechadoEm) ? ` · ${diaMes(deal.fechadoEm)}` : ""}
+                        </span>
+                      </td>
+                    )}
+                    {aba === "perdido" && (
+                      <td className="px-5 py-3.5 text-text-gray">{deal.motivoPerda || "—"}</td>
+                    )}
                     <td className="px-5 py-3.5">
                       <AtividadeIcone temAtividade={temAtividade} />
                     </td>
@@ -677,8 +740,8 @@ export default function FunnelBoard() {
               })}
               {dealsFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-text-faint">
-                    Nenhum negócio encontrado com esses filtros.
+                  <td colSpan={7} className="px-5 py-10 text-center text-text-faint">
+                    {aba === "ganho" ? "Nenhum negócio ganho ainda." : aba === "perdido" ? "Nenhum negócio perdido." : "Nenhum negócio encontrado com esses filtros."}
                   </td>
                 </tr>
               )}
