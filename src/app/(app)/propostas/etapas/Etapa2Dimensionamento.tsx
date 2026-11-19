@@ -14,7 +14,7 @@ import {
   whParaKwh,
 } from "@/lib/propostas/proposal-calculations";
 import { formatarDataBR, formatarNumero } from "@/lib/propostas/proposal-text";
-import { CONCESSIONARIAS_SUGERIDAS, TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE, TIPOS_ESTRUTURA } from "@/lib/propostas/constants";
+import { CONCESSIONARIAS_SUGERIDAS, CONCESSIONARIA_POR_ESTADO, TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE, TIPOS_ESTRUTURA } from "@/lib/propostas/constants";
 import { FASE_LABEL, type FaseRede } from "@/lib/propostas/types";
 import { EtapaProps, NumeroInput, Secao } from "../ui";
 
@@ -24,6 +24,11 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
   const [buscando, setBuscando] = useState(false);
   const [origemTarifas, setOrigemTarifas] = useState("");
   const ultimaBusca = useRef("");
+  /** Última concessionária preenchida sozinha (pelo estado da usina), para poder trocar se o estado mudar. */
+  const concessionariaAuto = useRef("");
+  /** true = as tarifas na tela vieram da ANEEL e ninguém as editou à mão. */
+  const tarifasAuto = useRef(false);
+  const sugeridaPeloEstado = CONCESSIONARIA_POR_ESTADO[dados.usinaEstado] === dados.concessionaria;
   const gerEsp = geracaoEspecifica(dados.irradiacaoWhM2Dia, dados.taxaDesempenhoPct);
   const kwp = kwpNecessario(dados.consumoMedioKwh, dados.fase, gerEsp);
 
@@ -54,16 +59,36 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
     set("tarifaTE", t.te);
     set("tarifaTUSD", t.tusd);
     if (t.fioB !== null) set("tarifaFioB", t.fioB);
+    tarifasAuto.current = true;
     setOrigemTarifas(
       `Tarifas da ANEEL (${t.distribuidora} · ${t.subgrupo}), vigentes desde ${formatarDataBR(t.vigenciaInicio)}, sem impostos.${t.avisos.length ? " " + t.avisos.join(" ") : ""}`
     );
   }
 
-  // Preenche sozinho quando a concessionária/perfil é definida e as tarifas ainda estão vazias.
+  /** Edição manual de uma tarifa: dali em diante a tela não sobrescreve os valores sozinha. */
+  function editarTarifa(campo: "tarifaTE" | "tarifaTUSD" | "tarifaFioB", n: number) {
+    tarifasAuto.current = false;
+    set(campo, n);
+  }
+
+  // Sugere a concessionária pelo estado da usina (só se o campo estiver vazio ou ainda com a sugestão anterior).
+  useEffect(() => {
+    const sugerida = CONCESSIONARIA_POR_ESTADO[dados.usinaEstado];
+    if (!sugerida) return;
+    const atual = dados.concessionaria.trim();
+    if (atual === "" || atual === concessionariaAuto.current) {
+      if (atual !== sugerida) set("concessionaria", sugerida);
+      concessionariaAuto.current = sugerida;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dados.usinaEstado]);
+
+  // Preenche sozinho quando a concessionária/perfil é definida e as tarifas ainda estão vazias
+  // (ou vieram da ANEEL e não foram editadas, caso em que troca junto com a concessionária).
   useEffect(() => {
     const chave = `${dados.concessionaria}|${dados.perfilConcessionaria}`;
     if (dados.concessionaria.trim().length < 3 || ultimaBusca.current === chave) return;
-    if (dados.tarifaTE || dados.tarifaTUSD || dados.tarifaFioB) return;
+    if ((dados.tarifaTE || dados.tarifaTUSD || dados.tarifaFioB) && !tarifasAuto.current) return;
     const timer = setTimeout(() => buscarTarifas(true), 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,7 +97,12 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
       <Secao titulo="Dados da fatura">
-        <Field label="Concessionária" required error={erros.concessionaria}>
+        <Field
+          label="Concessionária"
+          required
+          error={erros.concessionaria}
+          hint={sugeridaPeloEstado ? `Sugerida pelo estado da usina (${dados.usinaEstado}). Pode alterar.` : undefined}
+        >
           <input list="concessionarias" className={cls("concessionaria")} value={dados.concessionaria} onChange={(e) => set("concessionaria", e.target.value)} />
           <datalist id="concessionarias">
             {CONCESSIONARIAS_SUGERIDAS.map((c) => (
@@ -130,13 +160,13 @@ export default function Etapa2Dimensionamento({ dados, set, erros }: EtapaProps)
         </div>
         <div className="grid grid-cols-3 gap-4">
           <Field label="Tarifa TE" required error={erros.tarifaTE}>
-            <NumeroInput value={dados.tarifaTE} onChange={(n) => set("tarifaTE", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaTE ? inputErrorClass : ""} />
+            <NumeroInput value={dados.tarifaTE} onChange={(n) => editarTarifa("tarifaTE", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaTE ? inputErrorClass : ""} />
           </Field>
           <Field label="Tarifa TUSD" required error={erros.tarifaTUSD}>
-            <NumeroInput value={dados.tarifaTUSD} onChange={(n) => set("tarifaTUSD", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaTUSD ? inputErrorClass : ""} />
+            <NumeroInput value={dados.tarifaTUSD} onChange={(n) => editarTarifa("tarifaTUSD", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaTUSD ? inputErrorClass : ""} />
           </Field>
           <Field label="Tarifa de Fio B" required error={erros.tarifaFioB}>
-            <NumeroInput value={dados.tarifaFioB} onChange={(n) => set("tarifaFioB", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaFioB ? inputErrorClass : ""} />
+            <NumeroInput value={dados.tarifaFioB} onChange={(n) => editarTarifa("tarifaFioB", n)} sufixo="R$/kWh" casas={6} className={erros.tarifaFioB ? inputErrorClass : ""} />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-4">

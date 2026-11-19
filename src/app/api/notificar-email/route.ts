@@ -23,6 +23,7 @@ function esc(texto: string): string {
  * Segurança: os destinatários e o texto saem do Firestore (não do que o navegador envia),
  * então a rota não serve pra mandar mensagem arbitrária pra qualquer endereço.
  */
+
 export async function POST(req: NextRequest) {
   const idToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!idToken) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });

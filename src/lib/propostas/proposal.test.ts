@@ -353,6 +353,10 @@ describe("tarifas da ANEEL (linhas no formato do dicionário de dados)", () => {
 
   it("sigla a partir do texto da concessionária", () => {
     assert.equal(siglaDaConcessionaria("COSERN - Neoenergia Cosern"), "COSERN");
+    assert.equal(siglaDaConcessionaria("EPB - Energisa Paraíba"), "EPB");
+    assert.equal(siglaDaConcessionaria("Energisa Paraíba"), "EPB");
+    assert.equal(siglaDaConcessionaria("energisa pb"), "EPB");
+    assert.equal(siglaDaConcessionaria("CPFL Paulista"), "CPFL PAULISTA");
   });
 
   it("converte R$/MWh em R$/kWh e acha o Fio B", () => {

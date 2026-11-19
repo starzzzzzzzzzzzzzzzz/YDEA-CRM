@@ -31,8 +31,21 @@ export function normalizar(s: unknown): string {
     .trim();
 }
 
-/** "COSERN - Neoenergia Cosern" → "COSERN" (a sigla que a ANEEL usa). */
+/** Nomes (sem acento, minúsculos) que levam à sigla usada pela ANEEL nas distribuidoras principais. */
+const SIGLAS_POR_NOME: { sigla: string; nomes: string[] }[] = [
+  { sigla: "EPB", nomes: ["epb", "energisa paraiba", "energisa pb"] },
+  { sigla: "COSERN", nomes: ["cosern", "neoenergia cosern"] },
+];
+
+/**
+ * "COSERN - Neoenergia Cosern" → "COSERN"; "Energisa Paraíba" → "EPB" (a sigla que a ANEEL usa).
+ * Para as demais, usa o texto antes do " - ".
+ */
 export function siglaDaConcessionaria(texto: string): string {
+  const n = normalizar(texto);
+  for (const { sigla, nomes } of SIGLAS_POR_NOME) {
+    if (nomes.some((nome) => new RegExp(`(^|[^a-z0-9])${nome}([^a-z0-9]|$)`).test(n))) return sigla;
+  }
   return texto.split(/\s+-\s+/)[0].trim().toUpperCase();
 }
 

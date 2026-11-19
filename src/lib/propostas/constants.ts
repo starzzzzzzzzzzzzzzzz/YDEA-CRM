@@ -46,7 +46,13 @@ export const ESTADOS_BR = [
 ];
 
 /** Sugestões (o campo aceita qualquer texto). */
-export const CONCESSIONARIAS_SUGERIDAS = ["COSERN - Neoenergia Cosern"];
+export const CONCESSIONARIAS_SUGERIDAS = ["EPB - Energisa Paraíba", "COSERN - Neoenergia Cosern"];
+
+/** Concessionária mais provável pelo estado da usina (o campo continua editável). */
+export const CONCESSIONARIA_POR_ESTADO: Record<string, string> = {
+  PB: "EPB - Energisa Paraíba",
+  RN: "COSERN - Neoenergia Cosern",
+};
 
 export const NACIONALIDADE_PADRAO = "Brasileiro(a)";
 
