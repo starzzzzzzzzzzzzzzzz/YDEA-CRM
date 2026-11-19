@@ -116,6 +116,8 @@ export function dadosIniciais(args: {
     nacionalidade: NACIONALIDADE_PADRAO,
     clausula211: CLAUSULA_211_MODELO,
     clausula212: CLAUSULA_212_MODELO,
+    engenheiroNome: "",
+    engenheiroRegistro: "",
   };
 }
 

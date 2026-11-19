@@ -130,6 +130,10 @@ export type PropostaDados = {
   nacionalidade: string;
   clausula211: string;
   clausula212: string;
+  /** Responsável técnico que assina a proposta (opcional: propostas antigas não têm). */
+  engenheiroNome?: string;
+  /** Registro profissional, ex.: "CREA-PB 123456" ou "CFT 00000000000". */
+  engenheiroRegistro?: string;
 };
 
 export type LinhaComplementar = ItemComplementar & {

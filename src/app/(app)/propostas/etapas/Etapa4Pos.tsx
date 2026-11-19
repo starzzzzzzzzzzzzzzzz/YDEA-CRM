@@ -34,6 +34,17 @@ export default function Etapa4Pos({ dados, set }: EtapaProps) {
         </div>
       </Secao>
 
+      <Secao titulo="Responsável técnico (assina a proposta)">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Engenheiro eletricista">
+            <input className={inputClass} value={dados.engenheiroNome ?? ""} onChange={(e) => set("engenheiroNome", e.target.value)} />
+          </Field>
+          <Field label="Registro profissional (CREA/CFT)" hint="Ex.: CREA-PB 123456">
+            <input className={inputClass} value={dados.engenheiroRegistro ?? ""} onChange={(e) => set("engenheiroRegistro", e.target.value)} />
+          </Field>
+        </div>
+      </Secao>
+
       <Secao titulo="Informações para o contrato comercial">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Nacionalidade">
