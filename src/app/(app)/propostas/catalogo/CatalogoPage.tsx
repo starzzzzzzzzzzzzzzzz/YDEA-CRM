@@ -11,6 +11,7 @@ import {
   importarModulosCatalogo,
 } from "@/lib/firebase/catalogo";
 import { importarInversores, importarModulos } from "@/lib/propostas/catalogo-import";
+import { INVERSORES_PADRAO, MODULOS_PADRAO } from "@/lib/propostas/catalogo-padrao";
 import { formatarBRL, formatarNumero } from "@/lib/propostas/proposal-text";
 import { FASE_LABEL } from "@/lib/propostas/types";
 import { inputClass } from "@/components/ui/Field";
@@ -23,7 +24,7 @@ const btn = "flex items-center gap-1.5 rounded-lg bg-brand text-text-dark font-s
 
 export default function CatalogoPage() {
   const { showToast } = useToast();
-  const { modulos, inversores, carregando, erro, recarregar } = useCatalogo();
+  const { modulosProprios: modulos, inversoresProprios: inversores, carregando, erro, recarregar } = useCatalogo();
   const [textoModulos, setTextoModulos] = useState("");
   const [textoInversores, setTextoInversores] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -93,6 +94,11 @@ export default function CatalogoPage() {
           Cadastre os módulos e inversores uma vez; no gerador, escolher o modelo preenche potência, dimensões, garantias e valor.
           Cole as linhas de uma planilha (Excel/Google Sheets) ou separe por ponto e vírgula.
         </p>
+        <p className="text-[12.5px] text-text-gray mt-2">
+          O sistema já traz um catálogo padrão ({MODULOS_PADRAO.length} módulos e {INVERSORES_PADRAO.length} inversores de
+          Jinko, LONGi, Trina, Solis, Growatt, Huawei, WEG etc.) disponível direto na proposta. Aqui ficam só os itens da empresa:
+          cadastre (ou salve pela proposta) para guardar valor, dimensões e garantias — o cadastro da empresa substitui o padrão do mesmo modelo.
+        </p>
         {erro && <p className="text-[12.5px] text-badge-red-text mt-2">Não foi possível carregar o catálogo.</p>}
         {!carregando && !erro && modulos.length === 0 && inversores.length === 0 && (
           <button className={`${btn} mt-3`} disabled={ocupado} onClick={carregarExemplos}>
@@ -103,11 +109,11 @@ export default function CatalogoPage() {
 
       {/* Módulos */}
       <section className="bg-card-bg border border-border rounded-xl p-5 space-y-4">
-        <h2 className="font-display font-semibold text-[15px] text-text-dark">Módulos fotovoltaicos ({modulos.length})</h2>
+        <h2 className="font-display font-semibold text-[15px] text-text-dark">Módulos da empresa ({modulos.length})</h2>
         {carregando ? (
           <p className="text-sm text-text-faint">Carregando...</p>
         ) : modulos.length === 0 ? (
-          <p className="text-sm text-text-faint">Nenhum módulo cadastrado.</p>
+          <p className="text-sm text-text-faint">Nenhum módulo cadastrado pela empresa ainda.</p>
         ) : (
           <div className="overflow-auto">
             <table className="w-full text-[13px]">
@@ -150,11 +156,11 @@ export default function CatalogoPage() {
 
       {/* Inversores */}
       <section className="bg-card-bg border border-border rounded-xl p-5 space-y-4">
-        <h2 className="font-display font-semibold text-[15px] text-text-dark">Inversores ({inversores.length})</h2>
+        <h2 className="font-display font-semibold text-[15px] text-text-dark">Inversores da empresa ({inversores.length})</h2>
         {carregando ? (
           <p className="text-sm text-text-faint">Carregando...</p>
         ) : inversores.length === 0 ? (
-          <p className="text-sm text-text-faint">Nenhum inversor cadastrado.</p>
+          <p className="text-sm text-text-faint">Nenhum inversor cadastrado pela empresa ainda.</p>
         ) : (
           <div className="overflow-auto">
             <table className="w-full text-[13px]">

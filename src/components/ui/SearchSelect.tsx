@@ -20,6 +20,7 @@ export default function SearchSelect({
   disabled,
   emptyHint = "Nenhum resultado encontrado",
   size = "md",
+  limite,
 }: {
   items: SearchSelectItem[];
   value: SearchSelectItem | null;
@@ -30,6 +31,8 @@ export default function SearchSelect({
   disabled?: boolean;
   emptyHint?: string;
   size?: "md" | "lg";
+  /** Máximo de itens desenhados na lista (para catálogos grandes); o filtro continua olhando todos. */
+  limite?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -37,16 +40,16 @@ export default function SearchSelect({
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (i) =>
-        i.label.toLowerCase().includes(q) ||
-        i.sublabel?.toLowerCase().includes(q) ||
-        i.meta?.toLowerCase().includes(q)
-    );
+  const todosFiltrados = useMemo(() => {
+    // Todas as palavras digitadas precisam aparecer (em qualquer ordem): "jinko 580" acha "JinkoSolar JKM580N…".
+    const palavras = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (palavras.length === 0) return items;
+    return items.filter((i) => {
+      const texto = `${i.label} ${i.sublabel ?? ""} ${i.meta ?? ""}`.toLowerCase();
+      return palavras.every((p) => texto.includes(p));
+    });
   }, [items, query]);
+  const filtered = useMemo(() => (limite ? todosFiltrados.slice(0, limite) : todosFiltrados), [todosFiltrados, limite]);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -184,6 +187,11 @@ export default function SearchSelect({
                   {value?.id === item.id && <Check size={14} className="text-brand-strong shrink-0" />}
                 </button>
               ))
+            )}
+            {todosFiltrados.length > filtered.length && (
+              <div className="px-3.5 py-2 text-center text-xs text-text-faint border-t border-border-soft">
+                Mostrando {filtered.length} de {todosFiltrados.length} — digite para filtrar (ex.: marca + potência).
+              </div>
             )}
           </div>
 

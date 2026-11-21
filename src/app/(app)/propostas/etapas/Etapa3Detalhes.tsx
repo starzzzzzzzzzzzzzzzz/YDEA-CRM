@@ -39,7 +39,7 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
     label: `${i.marca} ${i.modelo}`,
     sublabel: `${formatarNumero(i.potenciaKw)} kW · ${i.tensaoSaida} · ${FASE_LABEL[i.fase]}`,
   }));
-  const catalogoVazio = "Catálogo vazio. Cadastre em Propostas → Catálogo de equipamentos.";
+  const naoAchou = "Não achou? Preencha os campos abaixo manualmente e, se quiser, salve no catálogo.";
 
   /** Escolheu um módulo da lista → preenche marca, potência, dimensões, garantias e valor. */
   function aplicarModulo(id: string) {
@@ -143,8 +143,8 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
       </Secao>
 
       <Secao titulo="Módulo" subtitulo={`Quantidade sugerida pelo dimensionamento: ${r.quantidadeModulosCalculada}`}>
-        <Field label="Escolher do catálogo" hint={catModulos.length ? `${catModulos.length} módulo(s) cadastrado(s). Escolher preenche os campos abaixo.` : catalogoVazio}>
-          <SearchSelect items={itensModulos} value={null} onChange={(i) => i && aplicarModulo(i.id)} placeholder="Clique para ver os módulos ou busque por marca, modelo ou potência..." emptyHint={catalogoVazio} />
+        <Field label="Escolher do catálogo" hint={`${catModulos.length} módulos no catálogo. Escolher preenche potência, dimensões e garantias. ${naoAchou}`}>
+          <SearchSelect items={itensModulos} value={null} onChange={(i) => i && aplicarModulo(i.id)} placeholder="Busque por marca, modelo ou potência (ex.: jinko 580)..." emptyHint="Nenhum módulo encontrado — preencha manualmente abaixo." limite={60} />
         </Field>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Marca do módulo" required error={erros.moduloMarca}>
@@ -191,8 +191,8 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
                 </button>
               )}
             </div>
-            <Field label="Escolher do catálogo" hint={catInversores.length ? `${catInversores.length} inversor(es) cadastrado(s). Escolher preenche os campos abaixo.` : catalogoVazio}>
-              <SearchSelect items={itensInversores} value={null} onChange={(i) => i && aplicarInversor(inv.id, i.id)} placeholder="Clique para ver os inversores ou busque por marca, modelo ou potência..." emptyHint={catalogoVazio} />
+            <Field label="Escolher do catálogo" hint={`${catInversores.length} inversores no catálogo. Escolher preenche potência, tensão e fase. ${naoAchou}`}>
+              <SearchSelect items={itensInversores} value={null} onChange={(i) => i && aplicarInversor(inv.id, i.id)} placeholder="Busque por marca, modelo ou potência (ex.: solis 5 kw)..." emptyHint="Nenhum inversor encontrado — preencha manualmente abaixo." limite={60} />
             </Field>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="Marca do inversor" required>

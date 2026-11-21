@@ -1,5 +1,6 @@
 import { collection, deleteDoc, doc, getDocs, setDoc, writeBatch } from "firebase/firestore";
 import { db } from "./config";
+import { idCatalogo } from "@/lib/propostas/catalogo-padrao";
 import type { CatalogoInversor, CatalogoModulo } from "@/lib/propostas/types";
 
 const COL_MODULOS = "catalogo_modulos";
@@ -9,15 +10,7 @@ function limpar<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
 
-/** Id estável por marca+modelo: cadastrar de novo o mesmo equipamento atualiza em vez de duplicar. */
-export function idCatalogo(marca: string, modelo: string): string {
-  return `${marca}-${modelo}`
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+export { idCatalogo };
 
 export async function fetchCatalogoModulos(): Promise<CatalogoModulo[]> {
   const snap = await getDocs(collection(db, COL_MODULOS));

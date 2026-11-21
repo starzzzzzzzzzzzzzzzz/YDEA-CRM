@@ -26,6 +26,7 @@ import {
   valorPorExtenso,
 } from "./proposal-text";
 import { validarEtapa } from "./validacao";
+import { INVERSORES_PADRAO, MODULOS_PADRAO, idCatalogo, mesclarCatalogo } from "./catalogo-padrao";
 import { TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE } from "./constants";
 import { interpretarTarifas, siglaDaConcessionaria } from "./aneel";
 import { importarInversores, importarModulos, numeroBR } from "./catalogo-import";
@@ -433,5 +434,58 @@ describe("tensão por fase", () => {
     for (const fase of ["monofasico", "bifasico", "trifasico"] as const) {
       assert.ok(TENSOES_POR_FASE[fase].includes(TENSAO_PADRAO_POR_FASE[fase]));
     }
+  });
+});
+
+describe("catálogo padrão de equipamentos", () => {
+  it("tem módulos e inversores, sem id repetido", () => {
+    assert.ok(MODULOS_PADRAO.length > 300);
+    assert.ok(INVERSORES_PADRAO.length > 400);
+    assert.equal(new Set(MODULOS_PADRAO.map((m) => m.id)).size, MODULOS_PADRAO.length);
+    assert.equal(new Set(INVERSORES_PADRAO.map((i) => i.id)).size, INVERSORES_PADRAO.length);
+  });
+
+  it("todo módulo tem marca, modelo e potência plausível (10–760 W)", () => {
+    for (const m of MODULOS_PADRAO) {
+      assert.ok(m.marca && m.modelo, m.id);
+      assert.ok(m.potenciaW >= 10 && m.potenciaW <= 760, `${m.modelo}: ${m.potenciaW}`);
+    }
+  });
+
+  it("todo inversor tem potência > 0, fase e tensão válidas", () => {
+    for (const i of INVERSORES_PADRAO) {
+      assert.ok(i.potenciaKw > 0 && i.potenciaKw <= 350, `${i.modelo}: ${i.potenciaKw}`);
+      assert.ok(["monofasico", "trifasico"].includes(i.fase), i.modelo);
+      assert.ok(["V220", "V380"].includes(i.tensaoSaida), i.modelo);
+    }
+  });
+
+  it("potências conferem com o código do modelo (amostras)", () => {
+    const mod = (m: string) => MODULOS_PADRAO.find((x) => x.modelo === m)?.potenciaW;
+    assert.equal(mod("JKM580N-72HL4-BDV"), 580);
+    assert.equal(mod("LR5-54HTH-430M"), 430);
+    assert.equal(mod("CHSM66N(DG)/F-BH 695"), 695); // Astronergy: só o número aparece na lista
+    const inv = (m: string) => INVERSORES_PADRAO.find((x) => x.modelo === m);
+    assert.equal(inv("S6-GR1P5K")?.potenciaKw, 5);
+    assert.equal(inv("S6-GR1P5K")?.fase, "monofasico");
+    assert.equal(inv("SIW200M050")?.potenciaKw, 5);
+    assert.equal(inv("SUN2000-3.68KTL-L1")?.potenciaKw, 3.68);
+    assert.equal(inv("SG10RT")?.fase, "trifasico");
+    assert.equal(inv("Solis-mini-700-4G")?.potenciaKw, 0.7);
+    assert.equal(inv("GW5K-ET")?.fase, "trifasico");
+  });
+
+  it("o catálogo da empresa sobrepõe o padrão do mesmo modelo, sem apagar campos que ele não traz", () => {
+    const base = MODULOS_PADRAO.find((m) => m.modelo === "JKM580N-72HL4-BDV")!;
+    const mesclado = mesclarCatalogo(MODULOS_PADRAO, [{ ...base, valorUnitario: 700, larguraMm: 1134, comprimentoMm: 2278 }]);
+    assert.equal(mesclado.length, MODULOS_PADRAO.length);
+    const item = mesclado.find((m) => m.id === base.id)!;
+    assert.equal(item.valorUnitario, 700);
+    assert.equal(item.potenciaW, 580);
+  });
+
+  it("idCatalogo é estável e ignora acentos/maiúsculas", () => {
+    assert.equal(idCatalogo("AE SOLAR", "AE650ME-132BD"), idCatalogo("ae solar", "ae650me-132bd"));
+    assert.equal(idCatalogo("Genérico 12V", "12V 100W"), "generico-12v-12v-100w");
   });
 });
