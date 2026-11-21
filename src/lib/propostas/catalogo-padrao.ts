@@ -1012,3 +1012,36 @@ export function mesclarCatalogo<T extends { id: string; marca: string; modelo: s
   for (const p of proprios) mapa.set(p.id, { ...mapa.get(p.id), ...p });
   return [...mapa.values()].sort(porNome);
 }
+
+// --- Escolha em cascata: marca → potência → modelo -----------------------------
+
+const sem = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/** Itens da marca digitada: igual (sem acento/maiúscula) ou, se não houver, começando com o texto. Vazio = todos. */
+export function filtrarPorMarca<T extends { marca: string }>(itens: T[], marca: string): T[] {
+  const m = sem(marca);
+  if (!m) return itens;
+  const exatos = itens.filter((i) => sem(i.marca) === m);
+  return exatos.length > 0 ? exatos : itens.filter((i) => sem(i.marca).startsWith(m));
+}
+
+/** Marcas disponíveis (ordem alfabética) com a quantidade de modelos de cada uma. */
+export function marcasDoCatalogo(itens: { marca: string }[]): { marca: string; quantidade: number }[] {
+  const mapa = new Map<string, number>();
+  for (const i of itens) mapa.set(i.marca, (mapa.get(i.marca) ?? 0) + 1);
+  return [...mapa.entries()].map(([marca, quantidade]) => ({ marca, quantidade })).sort((a, b) => a.marca.localeCompare(b.marca, "pt-BR"));
+}
+
+/** Potências disponíveis (crescente) para a marca escolhida, com a quantidade de modelos de cada uma. */
+export function potenciasDoCatalogo<T extends { marca: string }>(itens: T[], marca: string, potencia: (i: T) => number): { potencia: number; quantidade: number }[] {
+  const mapa = new Map<number, number>();
+  for (const i of filtrarPorMarca(itens, marca)) mapa.set(potencia(i), (mapa.get(potencia(i)) ?? 0) + 1);
+  return [...mapa.entries()].map(([p, quantidade]) => ({ potencia: p, quantidade })).sort((a, b) => a.potencia - b.potencia);
+}
+
+/** Modelos da marca (e da potência, se informada), em ordem alfabética natural. */
+export function modelosDoCatalogo<T extends { marca: string; modelo: string }>(itens: T[], marca: string, potenciaEscolhida: number, potencia: (i: T) => number): T[] {
+  const daMarca = filtrarPorMarca(itens, marca);
+  const lista = potenciaEscolhida > 0 ? daMarca.filter((i) => Math.abs(potencia(i) - potenciaEscolhida) < 1e-6) : daMarca;
+  return [...lista].sort(porNome);
+}

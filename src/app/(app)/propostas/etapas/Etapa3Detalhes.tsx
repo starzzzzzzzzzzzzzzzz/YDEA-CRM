@@ -4,7 +4,8 @@ import { BookmarkPlus, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { salvarInversorCatalogo, salvarModuloCatalogo } from "@/lib/firebase/catalogo";
 import { Field, inputClass, inputErrorClass } from "@/components/ui/Field";
-import SearchSelect, { type SearchSelectItem } from "@/components/ui/SearchSelect";
+import ComboInput, { ComboNumero } from "@/components/ui/ComboInput";
+import { marcasDoCatalogo, modelosDoCatalogo, potenciasDoCatalogo } from "@/lib/propostas/catalogo-padrao";
 import { inversorVazio, novoId } from "@/lib/propostas/dados-iniciais";
 import { ALIQUOTA_COMISSAO, ALIQUOTA_IMPOSTO, MAO_DE_OBRA_POR_MODULO, calcularProposta } from "@/lib/propostas/proposal-calculations";
 import { formatarBRL, formatarNumero } from "@/lib/propostas/proposal-text";
@@ -29,20 +30,27 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
     set("inversores", dados.inversores.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }
 
-  const itensModulos: SearchSelectItem[] = catModulos.map((m) => ({
-    id: m.id,
-    label: `${m.marca} ${m.modelo}`,
-    sublabel: `${formatarNumero(m.potenciaW, 0)} W${m.larguraMm && m.comprimentoMm ? ` · ${m.larguraMm}×${m.comprimentoMm} mm` : ""}`,
-  }));
-  const itensInversores: SearchSelectItem[] = catInversores.map((i) => ({
-    id: i.id,
-    label: `${i.marca} ${i.modelo}`,
-    sublabel: `${formatarNumero(i.potenciaKw)} kW · ${i.tensaoSaida} · ${FASE_LABEL[i.fase]}`,
-  }));
-  const naoAchou = "Não achou? Preencha os campos abaixo manualmente e, se quiser, salve no catálogo.";
+  const naoAchou = "Não existe no catálogo? Digite manualmente nos campos — e, se quiser, salve no catálogo.";
+  const qtd = (n: number) => `${n} modelo${n > 1 ? "s" : ""}`;
+  const mesmaMarca = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+  // Módulo: marca → potência (W) → modelo
+  const opMarcasMod = marcasDoCatalogo(catModulos).map((m) => ({ value: m.marca, sublabel: qtd(m.quantidade) }));
+  const opPotMod = potenciasDoCatalogo(catModulos, dados.modulo.marca, (m) => m.potenciaW).map((p) => ({ potencia: p.potencia, sublabel: qtd(p.quantidade) }));
+  const opModelosMod = modelosDoCatalogo(catModulos, dados.modulo.marca, dados.modulo.potenciaW, (m) => m.potenciaW).map((m) => ({ value: m.modelo, id: m.id, sublabel: `${formatarNumero(m.potenciaW, 0)} W` }));
+
+  function escolherMarcaModulo(marca: string) {
+    // Trocou de marca → o modelo, a potência e os dados que dependem deles deixam de valer.
+    if (mesmaMarca(marca, dados.modulo.marca)) return setModulo("marca", marca);
+    set("modulo", { ...dados.modulo, marca, modelo: "", potenciaW: 0, larguraMm: undefined, comprimentoMm: undefined, garantiaDesempenhoAnos: undefined, garantiaFabricacaoAnos: undefined });
+  }
+  function escolherPotenciaModulo(w: number) {
+    if (w === dados.modulo.potenciaW) return;
+    set("modulo", { ...dados.modulo, potenciaW: w, modelo: "", larguraMm: undefined, comprimentoMm: undefined, garantiaDesempenhoAnos: undefined, garantiaFabricacaoAnos: undefined });
+  }
 
   /** Escolheu um módulo da lista → preenche marca, potência, dimensões, garantias e valor. */
-  function aplicarModulo(id: string) {
+  function aplicarModulo(id: string | undefined) {
     const achado = catModulos.find((m) => m.id === id);
     if (!achado) return;
     set("modulo", {
@@ -57,6 +65,15 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
       garantiaFabricacaoAnos: achado.garantiaFabricacaoAnos,
     });
   }
+
+  const opMarcasInv = marcasDoCatalogo(catInversores).map((m) => ({ value: m.marca, sublabel: qtd(m.quantidade) }));
+  const potenciasInv = (inv: InversorKit) => potenciasDoCatalogo(catInversores, inv.marca, (i) => i.potenciaKw);
+  const modelosInv = (inv: InversorKit) =>
+    modelosDoCatalogo(catInversores, inv.marca, inv.potenciaKw, (i) => i.potenciaKw).map((i) => ({
+      value: i.modelo,
+      id: i.id,
+      sublabel: `${formatarNumero(i.potenciaKw)} kW · ${FASE_LABEL[i.fase]} · ${i.tensaoSaida}`,
+    }));
 
   function aplicarInversor(invId: string, catId: string) {
     const achado = catInversores.find((i) => i.id === catId);
@@ -143,18 +160,16 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
       </Secao>
 
       <Secao titulo="Módulo" subtitulo={`Quantidade sugerida pelo dimensionamento: ${r.quantidadeModulosCalculada}`}>
-        <Field label="Escolher do catálogo" hint={`${catModulos.length} módulos no catálogo. Escolher preenche potência, dimensões e garantias. ${naoAchou}`}>
-          <SearchSelect items={itensModulos} value={null} onChange={(i) => i && aplicarModulo(i.id)} placeholder="Busque por marca, modelo ou potência (ex.: jinko 580)..." emptyHint="Nenhum módulo encontrado — preencha manualmente abaixo." limite={60} />
-        </Field>
+        <p className="text-[12px] text-text-faint -mt-1">{`Clique em Marca → Potência → Modelo para escolher (${catModulos.length} módulos no catálogo). ${naoAchou}`}</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Marca do módulo" required error={erros.moduloMarca}>
-            <input className={cls("moduloMarca")} value={dados.modulo.marca} onChange={(e) => setModulo("marca", e.target.value)} />
+            <ComboInput className={erros.moduloMarca ? inputErrorClass : ""} placeholder="Clique para escolher ou digite" value={dados.modulo.marca} options={opMarcasMod} onChange={(t) => setModulo("marca", t)} onPick={(o) => escolherMarcaModulo(o.value)} />
           </Field>
           <Field label="Potência do módulo" required error={erros.moduloPotencia}>
-            <NumeroInput value={dados.modulo.potenciaW} onChange={(n) => setModulo("potenciaW", n)} sufixo="W" className={erros.moduloPotencia ? inputErrorClass : ""} />
+            <ComboNumero value={dados.modulo.potenciaW} options={opPotMod} onChange={(n) => setModulo("potenciaW", n)} onPick={escolherPotenciaModulo} sufixo="W" placeholder="Escolha ou digite" className={erros.moduloPotencia ? inputErrorClass : ""} />
           </Field>
           <Field label="Modelo do módulo" required error={erros.moduloModelo}>
-            <input className={cls("moduloModelo")} value={dados.modulo.modelo} onChange={(e) => setModulo("modelo", e.target.value)} />
+            <ComboInput className={erros.moduloModelo ? inputErrorClass : ""} placeholder="Clique para escolher ou digite" value={dados.modulo.modelo} options={opModelosMod} onChange={(t) => setModulo("modelo", t)} onPick={(o) => aplicarModulo(o.id)} vazioHint="Nenhum modelo para essa marca/potência — digite manualmente." />
           </Field>
           <Field label="Quantidade" hint="Vazio = usa a quantidade calculada.">
             <NumeroInput value={dados.modulo.quantidade ?? 0} onChange={(n) => setModulo("quantidade", n || undefined)} placeholder={String(r.quantidadeModulosCalculada)} />
@@ -191,18 +206,16 @@ export default function Etapa3Detalhes({ dados, set, erros }: EtapaProps) {
                 </button>
               )}
             </div>
-            <Field label="Escolher do catálogo" hint={`${catInversores.length} inversores no catálogo. Escolher preenche potência, tensão e fase. ${naoAchou}`}>
-              <SearchSelect items={itensInversores} value={null} onChange={(i) => i && aplicarInversor(inv.id, i.id)} placeholder="Busque por marca, modelo ou potência (ex.: solis 5 kw)..." emptyHint="Nenhum inversor encontrado — preencha manualmente abaixo." limite={60} />
-            </Field>
+            <p className="text-[12px] text-text-faint -mt-1">{`Clique em Marca → Potência → Modelo para escolher (${catInversores.length} inversores no catálogo). ${naoAchou}`}</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="Marca do inversor" required>
-                <input className={inputClass} value={inv.marca} onChange={(e) => setInversor(inv.id, { marca: e.target.value })} />
+                <ComboInput placeholder="Clique para escolher ou digite" value={inv.marca} options={opMarcasInv} onChange={(t) => setInversor(inv.id, { marca: t })} onPick={(o) => (mesmaMarca(o.value, inv.marca) ? setInversor(inv.id, { marca: o.value }) : setInversor(inv.id, { marca: o.value, modelo: "", potenciaKw: 0, potenciaMaximaVA: undefined, garantiaFabricacaoAnos: undefined }))} />
               </Field>
               <Field label="Potência do inversor" required>
-                <NumeroInput value={inv.potenciaKw} onChange={(n) => setInversor(inv.id, { potenciaKw: n })} sufixo="kW" />
+                <ComboNumero value={inv.potenciaKw} options={potenciasInv(inv).map((p) => ({ potencia: p.potencia, sublabel: qtd(p.quantidade) }))} onChange={(n) => setInversor(inv.id, { potenciaKw: n })} onPick={(n) => n !== inv.potenciaKw && setInversor(inv.id, { potenciaKw: n, modelo: "", potenciaMaximaVA: undefined, garantiaFabricacaoAnos: undefined })} sufixo="kW" placeholder="Escolha ou digite" />
               </Field>
               <Field label="Modelo do inversor" required>
-                <input className={inputClass} value={inv.modelo} onChange={(e) => setInversor(inv.id, { modelo: e.target.value })} />
+                <ComboInput placeholder="Clique para escolher ou digite" value={inv.modelo} options={modelosInv(inv)} onChange={(t) => setInversor(inv.id, { modelo: t })} onPick={(o) => o.id && aplicarInversor(inv.id, o.id)} vazioHint="Nenhum modelo para essa marca/potência — digite manualmente." />
               </Field>
               <Field label="Tensão de saída" required>
                 <select className={inputClass} value={inv.tensaoSaida} onChange={(e) => setInversor(inv.id, { tensaoSaida: e.target.value })}>

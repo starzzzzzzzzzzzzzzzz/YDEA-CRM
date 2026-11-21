@@ -26,7 +26,7 @@ import {
   valorPorExtenso,
 } from "./proposal-text";
 import { validarEtapa } from "./validacao";
-import { INVERSORES_PADRAO, MODULOS_PADRAO, idCatalogo, mesclarCatalogo } from "./catalogo-padrao";
+import { INVERSORES_PADRAO, MODULOS_PADRAO, idCatalogo, marcasDoCatalogo, mesclarCatalogo, modelosDoCatalogo, potenciasDoCatalogo } from "./catalogo-padrao";
 import { TENSAO_PADRAO_POR_FASE, TENSOES_POR_FASE } from "./constants";
 import { interpretarTarifas, siglaDaConcessionaria } from "./aneel";
 import { importarInversores, importarModulos, numeroBR } from "./catalogo-import";
@@ -487,5 +487,39 @@ describe("catálogo padrão de equipamentos", () => {
   it("idCatalogo é estável e ignora acentos/maiúsculas", () => {
     assert.equal(idCatalogo("AE SOLAR", "AE650ME-132BD"), idCatalogo("ae solar", "ae650me-132bd"));
     assert.equal(idCatalogo("Genérico 12V", "12V 100W"), "generico-12v-12v-100w");
+  });
+});
+
+describe("escolha em cascata (marca → potência → modelo)", () => {
+  it("lista as marcas sem repetir", () => {
+    const marcas = marcasDoCatalogo(INVERSORES_PADRAO).map((m) => m.marca);
+    assert.equal(new Set(marcas).size, marcas.length);
+    assert.ok(marcas.includes("Solis") && marcas.includes("WEG"));
+  });
+
+  it("potências só da marca escolhida, em ordem crescente", () => {
+    const pots = potenciasDoCatalogo(INVERSORES_PADRAO, "Solis", (i) => i.potenciaKw).map((p) => p.potencia);
+    assert.ok(pots.includes(5));
+    assert.deepEqual(pots, [...pots].sort((a, b) => a - b));
+    const potsWeg = potenciasDoCatalogo(INVERSORES_PADRAO, "weg", (i) => i.potenciaKw).map((p) => p.potencia); // sem diferenciar maiúscula
+    assert.ok(!potsWeg.includes(0.7)); // 0,7 kW é da Solis
+  });
+
+  it("modelos da marca + potência", () => {
+    const modelos = modelosDoCatalogo(INVERSORES_PADRAO, "Solis", 5, (i) => i.potenciaKw).map((i) => i.modelo);
+    assert.ok(modelos.includes("S6-GR1P5K") && modelos.includes("S5-GR1P5K"));
+    assert.ok(modelos.every((m) => !m.includes("WEG")));
+    const semPotencia = modelosDoCatalogo(INVERSORES_PADRAO, "Solis", 0, (i) => i.potenciaKw);
+    assert.ok(semPotencia.length > modelos.length);
+  });
+
+  it("marca inexistente não tem sugestões (fica livre para digitar)", () => {
+    assert.equal(potenciasDoCatalogo(MODULOS_PADRAO, "Marca Que Não Existe", (m) => m.potenciaW).length, 0);
+    assert.equal(modelosDoCatalogo(MODULOS_PADRAO, "Marca Que Não Existe", 0, (m) => m.potenciaW).length, 0);
+  });
+
+  it("marca digitada pela metade sugere as que começam com o texto", () => {
+    const marcas = new Set(modelosDoCatalogo(INVERSORES_PADRAO, "sol", 0, (i) => i.potenciaKw).map((i) => i.marca));
+    assert.ok(marcas.has("Solis") && marcas.has("Solplanet") && !marcas.has("SMA"));
   });
 });
