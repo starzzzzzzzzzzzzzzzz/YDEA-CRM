@@ -5,6 +5,11 @@ import { hojeISO } from "@/lib/propostas/proposal-text";
 export const runtime = "nodejs";
 /** A consulta à ANEEL pode demorar; sem isso a Vercel corta a função em poucos segundos. */
 export const maxDuration = 60;
+/**
+ * A ANEEL não aceita conexão de servidores fora do Brasil (a Vercel usa Washington por padrão e dá
+ * "Connect Timeout"). São Paulo (gru1) resolve.
+ */
+export const preferredRegion = "gru1";
 
 const ANEEL = "https://dadosabertos.aneel.gov.br/api/3/action";
 /** Conjunto "Tarifas de aplicação das distribuidoras" (TE e TUSD totais). Usado se a busca pelo nome falhar. */
@@ -83,20 +88,20 @@ async function tratar(req: NextRequest) {
   try {
     const ano = new Date().getFullYear();
 
-    // TE e TUSD: conjunto "tarifas homologadas"
-    let idHomologadas = RESOURCE_HOMOLOGADAS_FALLBACK;
-    try {
-      const rec = (await recursosDoConjunto("tarifas-distribuidoras-energia-eletrica")).find(
-        (r) => /tarifas-homologadas/i.test(r.name ?? "") && /csv/i.test(r.format ?? "") && r.datastore_active !== false
-      );
-      if (rec) idHomologadas = rec.id;
-    } catch {
-      /* usa o id de reserva */
-    }
+    // Lista dos arquivos dos dois conjuntos da ANEEL, em paralelo (se a ANEEL não responder, falha em ~10 s).
+    const [recHomologadas, recComponentes] = await Promise.all([
+      recursosDoConjunto("tarifas-distribuidoras-energia-eletrica").catch(() => [] as Recurso[]),
+      recursosDoConjunto("componentes-tarifarias"),
+    ]);
+
+    // TE e TUSD: conjunto "tarifas homologadas" (se a busca pelo nome falhar, usa o id de reserva).
+    const idHomologadas =
+      recHomologadas.find((r) => /tarifas-homologadas/i.test(r.name ?? "") && /csv/i.test(r.format ?? "") && r.datastore_active !== false)?.id ??
+      RESOURCE_HOMOLOGADAS_FALLBACK;
 
     // Fio B: conjunto "componentes tarifárias" — um arquivo por ano (o do ano atual e o anterior,
     // porque a vigência de janeiro a março ainda pode ser a do ano passado).
-    const idsComponentes = (await recursosDoConjunto("componentes-tarifarias"))
+    const idsComponentes = recComponentes
       .filter((r) => r.datastore_active && new RegExp(`componentes-tarifarias-(${ano}|${ano - 1})\\.csv`, "i").test(r.name ?? ""))
       .map((r) => r.id);
 
