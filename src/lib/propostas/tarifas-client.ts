@@ -11,7 +11,7 @@ export async function buscarTarifasAneel(concessionaria: string, subgrupo: strin
     const qs = new URLSearchParams({ concessionaria, subgrupo });
     const r = await fetch(`/api/tarifas?${qs}`, { headers: { Authorization: `Bearer ${idToken}` } });
     const d = await r.json();
-    if (!r.ok) return { ok: false, erro: d.error ?? "Não foi possível buscar as tarifas." };
+    if (!r.ok) return { ok: false, erro: `${d.error ?? "Não foi possível buscar as tarifas."}${d.detalhe ? ` (${d.detalhe})` : ""}` };
     return { ok: true, tarifas: d.tarifas as TarifasAneel };
   } catch {
     return { ok: false, erro: "Não foi possível buscar as tarifas." };

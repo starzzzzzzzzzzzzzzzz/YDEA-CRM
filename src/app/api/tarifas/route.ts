@@ -4,6 +4,8 @@ import { interpretarTarifas, siglaDaConcessionaria, type LinhaAneel, type Tarifa
 import { hojeISO } from "@/lib/propostas/proposal-text";
 
 export const runtime = "nodejs";
+/** A consulta à ANEEL pode demorar; sem isso a Vercel corta a função em poucos segundos. */
+export const maxDuration = 60;
 
 const ANEEL = "https://dadosabertos.aneel.gov.br/api/3/action";
 /** Conjunto "Tarifas de aplicação das distribuidoras" (TE e TUSD totais). Usado se a busca pelo nome falhar. */
@@ -17,7 +19,7 @@ const TTL_MS = 12 * 60 * 60 * 1000;
 type Recurso = { id: string; name?: string; format?: string; datastore_active?: boolean };
 
 async function json(url: string): Promise<unknown> {
-  const r = await fetch(url, { headers: CABECALHOS, cache: "no-store", signal: AbortSignal.timeout(25_000) });
+  const r = await fetch(url, { headers: CABECALHOS, cache: "no-store", signal: AbortSignal.timeout(20_000) });
   if (!r.ok) throw new Error(`ANEEL respondeu ${r.status}`);
   return r.json();
 }
@@ -33,12 +35,13 @@ async function linhas(resourceId: string, sigla: string): Promise<LinhaAneel[]> 
   return d.result?.records ?? [];
 }
 
-export async function GET(req: NextRequest) {
+async function tratar(req: NextRequest) {
   const idToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!idToken) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   try {
     await adminAuth().verifyIdToken(idToken);
-  } catch {
+  } catch (err) {
+    console.error("tarifas: verifyIdToken falhou:", err);
     return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
   }
 
@@ -89,6 +92,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ tarifas: resultado });
   } catch (err) {
     console.error("Erro ao buscar tarifas na ANEEL:", err);
-    return NextResponse.json({ error: "Não foi possível consultar a ANEEL agora. Informe as tarifas manualmente." }, { status: 502 });
+    return NextResponse.json(
+      {
+        error: "Não foi possível consultar a ANEEL agora. Informe as tarifas manualmente.",
+        detalhe: err instanceof Error ? err.message : String(err),
+      },
+      { status: 502 }
+    );
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    return await tratar(req);
+  } catch (err) {
+    // Qualquer falha inesperada vira JSON com o motivo, em vez de um 500 sem explicação.
+    console.error("tarifas: erro inesperado:", err);
+    return NextResponse.json(
+      { error: "Erro interno ao buscar as tarifas.", detalhe: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }

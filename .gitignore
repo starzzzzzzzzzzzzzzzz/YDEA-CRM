@@ -45,3 +45,5 @@ next-env.d.ts
 
 # testes do gerador de propostas
 .test-build
+backup-limpeza-*.json
+guardian-account-data.txt
