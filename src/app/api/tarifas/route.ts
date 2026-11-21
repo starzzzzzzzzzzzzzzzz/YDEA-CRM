@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase/admin";
 import { interpretarTarifas, siglaDaConcessionaria, type LinhaAneel, type TarifasAneel } from "@/lib/propostas/aneel";
 import { hojeISO } from "@/lib/propostas/proposal-text";
 
@@ -15,6 +14,26 @@ const CABECALHOS = { "User-Agent": "YDEA-CRM/1.0 (+tarifas)", Accept: "applicati
 // Cache em memória (a ANEEL atualiza semanalmente; a tarifa muda no máximo 1x por ano por distribuidora).
 const CACHE = new Map<string, { em: number; valor: TarifasAneel }>();
 const TTL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * Confere o token de login direto no Google (Identity Toolkit), sem o firebase-admin:
+ * na Vercel o firebase-admin está falhando ao carregar (ERR_REQUIRE_ESM), e esta rota só precisa saber
+ * se quem chama está logado.
+ */
+async function tokenValido(idToken: string): Promise<boolean> {
+  const chave = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  if (!chave) throw new Error("NEXT_PUBLIC_FIREBASE_API_KEY não está definida no servidor.");
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(chave)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!r.ok) return false;
+  const d = (await r.json()) as { users?: unknown[] };
+  return Array.isArray(d.users) && d.users.length > 0;
+}
 
 type Recurso = { id: string; name?: string; format?: string; datastore_active?: boolean };
 
@@ -38,12 +57,17 @@ async function linhas(resourceId: string, sigla: string): Promise<LinhaAneel[]> 
 async function tratar(req: NextRequest) {
   const idToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!idToken) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  let valido = false;
   try {
-    await adminAuth().verifyIdToken(idToken);
+    valido = await tokenValido(idToken);
   } catch (err) {
-    console.error("tarifas: verifyIdToken falhou:", err);
-    return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
+    console.error("tarifas: falha ao validar o login:", err);
+    return NextResponse.json(
+      { error: "Não foi possível validar o login agora.", detalhe: err instanceof Error ? err.message : String(err) },
+      { status: 502 }
+    );
   }
+  if (!valido) return NextResponse.json({ error: "Sessão inválida." }, { status: 401 });
 
   const concessionaria = req.nextUrl.searchParams.get("concessionaria") ?? "";
   const subgrupo = (req.nextUrl.searchParams.get("subgrupo") ?? "B1").toUpperCase();
