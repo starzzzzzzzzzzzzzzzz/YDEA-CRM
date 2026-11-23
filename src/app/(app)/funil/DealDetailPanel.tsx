@@ -27,6 +27,7 @@ import {
   Users,
   MapPin,
   ListChecks,
+  RotateCcw,
 } from "lucide-react";
 import { useCrmData } from "@/lib/store/CrmDataContext";
 import { useAuth } from "@/lib/store/AuthContext";
@@ -99,6 +100,7 @@ export default function DealDetailPanel({
   onClose,
   onDuplicate,
   onAtividadesStatusChange,
+  onStatusChange,
 }: {
   dealId: string;
   onClose: () => void;
@@ -107,6 +109,8 @@ export default function DealDetailPanel({
   /** Avisa o Kanban quando a situação de "tem atividade pendente" deste negócio muda,
    * pro card atualizar o ícone na hora, sem esperar um refetch. */
   onAtividadesStatusChange?: (dealId: string, pendente: boolean) => void;
+  /** Avisa o funil que o status mudou (para ele abrir a aba Ganhos/Perdidos/Em andamento). */
+  onStatusChange?: (status: "aberto" | "ganho" | "perdido") => void;
 }) {
   const { deals, getOrganizacao, getPessoa, updateDeal, removeDeal, criarNegociosSeguintes } =
     useCrmData();
@@ -188,13 +192,18 @@ export default function DealDetailPanel({
             "Este card foi importado da SolarZ.\n\nCriar automaticamente o(s) card(s) do próximo funil?\n\nOK = criar  |  Cancelar = só marcar como ganho"
           )
         : true;
-    updateDeal(deal!.id, {
+    const gravou = await updateDeal(deal!.id, {
       status,
       fechadoEm: new Date().toISOString(),
       motivoPerda: status === "perdido" ? motivoPerda || undefined : undefined,
     });
     setMotivoPerdaAberto(false);
     setMotivoPerda("");
+    if (!gravou) {
+      showToast("Não consegui salvar no servidor. O negócio continua como estava — tente de novo.", "error");
+      return;
+    }
+    onStatusChange?.(status);
 
     if (status === "ganho" && !jaEstavaGanho && criarSeguintes) {
       try {
@@ -228,6 +237,20 @@ export default function DealDetailPanel({
       status === "ganho" ? "Negócio marcado como ganho 🎉" : "Negócio marcado como perdido",
       status === "ganho" ? "success" : "info"
     );
+  }
+
+  async function handleReabrir() {
+    const gravou = await updateDeal(deal!.id, {
+      status: "aberto",
+      fechadoEm: undefined,
+      motivoPerda: undefined,
+    });
+    if (!gravou) {
+      showToast("Não consegui reabrir o negócio. Tente de novo.", "error");
+      return;
+    }
+    onStatusChange?.("aberto");
+    showToast("Negócio reaberto — voltou para Em andamento", "success");
   }
 
   function handleStageClick(stageId: string) {
@@ -518,28 +541,44 @@ export default function DealDetailPanel({
               )}
             </div>
 
-            <button
-              onClick={() => handleStatus("ganho")}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                deal.status === "ganho"
-                  ? "bg-badge-green-text text-white"
-                  : "bg-badge-green-bg text-badge-green-text hover:opacity-80"
-              }`}
-            >
-              <Check size={14} />
-              Ganho
-            </button>
-            <button
-              onClick={() => handleStatus("perdido")}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors ${
-                deal.status === "perdido"
-                  ? "bg-badge-red-text text-white"
-                  : "bg-badge-red-bg text-badge-red-text hover:opacity-80"
-              }`}
-            >
-              <Ban size={14} />
-              Perdido
-            </button>
+            {deal.status === "ganho" || deal.status === "perdido" ? (
+              <>
+                <span
+                  className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold ${
+                    deal.status === "ganho"
+                      ? "bg-badge-green-text text-white"
+                      : "bg-badge-red-text text-white"
+                  }`}
+                >
+                  {deal.status === "ganho" ? <Check size={14} /> : <Ban size={14} />}
+                  {deal.status === "ganho" ? "Ganho" : "Perdido"}
+                </span>
+                <button
+                  onClick={handleReabrir}
+                  className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-1.5 text-sm font-semibold text-text-gray hover:bg-panel-bg transition-colors"
+                >
+                  <RotateCcw size={14} />
+                  Reabrir
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleStatus("ganho")}
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors bg-badge-green-bg text-badge-green-text hover:opacity-80"
+                >
+                  <Check size={14} />
+                  Ganho
+                </button>
+                <button
+                  onClick={() => handleStatus("perdido")}
+                  className="flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors bg-badge-red-bg text-badge-red-text hover:opacity-80"
+                >
+                  <Ban size={14} />
+                  Perdido
+                </button>
+              </>
+            )}
 
             <div className="relative">
               <button

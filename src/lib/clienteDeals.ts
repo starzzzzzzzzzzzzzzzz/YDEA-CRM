@@ -13,6 +13,11 @@ function dig(s?: string | null) {
   return (s ?? "").replace(/\D/g, "");
 }
 
+/** Tira prefixos de funil do título, ex.: "[ENGENHARIA] João Silva" -> "joao silva". */
+function tituloSemPrefixo(titulo?: string | null) {
+  return norm((titulo ?? "").replace(/^\s*(\[[^\]]*\]\s*)+/, ""));
+}
+
 /** Negócios que pertencem a um cliente (casa por CPF/CNPJ ou, na falta, pelo nome). */
 export function dealsDoCliente(
   cliente: Cliente,
@@ -27,7 +32,8 @@ export function dealsDoCliente(
     const pes = getPessoa(d.pessoaId);
     const docs = [org?.cpf, org?.cnpj, pes?.cpf].map(dig).filter((x) => x.length >= 11);
     if (doc.length >= 11 && docs.includes(doc)) return true;
-    const nomes = [org?.nome, pes?.nome].map(norm).filter(Boolean);
+    // Também casa pelo título do negócio (o nome do cliente costuma ser o título).
+    const nomes = [org?.nome, pes?.nome, tituloSemPrefixo(d.titulo)].map(norm).filter(Boolean);
     return !!nome && nomes.includes(nome);
   });
 }

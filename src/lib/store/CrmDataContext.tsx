@@ -58,7 +58,8 @@ type CrmDataContextValue = {
   addOrganizacao: (org: Organizacao) => void;
   addPessoa: (pessoa: Pessoa) => void;
   addDeal: (deal: Omit<Deal, "id" | "createdAt">) => Promise<Deal>;
-  updateDeal: (id: string, patch: Partial<Deal>) => void;
+  /** Grava no Firestore; devolve false (e desfaz a mudança na tela) se a gravação falhar. */
+  updateDeal: (id: string, patch: Partial<Deal>) => Promise<boolean>;
   removeDeal: (id: string) => Promise<void>;
   duplicateDeal: (deal: Deal) => Promise<Deal>;
   /**
@@ -279,7 +280,7 @@ export function CrmDataProvider({
     return criado;
   }
 
-  function updateDeal(id: string, patch: Partial<Deal>) {
+  async function updateDeal(id: string, patch: Partial<Deal>): Promise<boolean> {
     // Mudou de etapa? Registra no histórico (base para tempo por etapa e conversão).
     const atual = deals.find((d) => d.id === id);
     let patchFinal = patch;
@@ -295,9 +296,17 @@ export function CrmDataProvider({
     // Otimista: reflete na hora na tela (essencial pro drag-and-drop do Kanban não travar),
     // e grava no Firestore em paralelo.
     setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...patchFinal } : d)));
-    updateDealDoc(id, patchFinal).catch((err) =>
-      console.error("Erro ao salvar alteração do negócio no Firestore:", err)
-    );
+    try {
+      await updateDealDoc(id, patchFinal);
+      return true;
+    } catch (err) {
+      console.error("Erro ao salvar alteração do negócio no Firestore:", err);
+      // Não gravou: desfaz na tela, para não parecer salvo e sumir ao recarregar.
+      if (atual) {
+        setDeals((prev) => prev.map((d) => (d.id === id ? atual : d)));
+      }
+      return false;
+    }
   }
 
   async function criarNegociosSeguintes(deal: Deal): Promise<ResultadoCadeia> {

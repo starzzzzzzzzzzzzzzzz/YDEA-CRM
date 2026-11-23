@@ -4,6 +4,17 @@ Este arquivo registra, em ordem cronológica, o que cada versão entregue faz e 
 
 ---
 
+## v22 — Ganho/Perdido confiáveis, Reabrir e pesquisa por situação
+
+- **Ganho/Perdido agora confirmam a gravação:** antes, se o Firestore recusasse a escrita, o erro ia só para o console e o card parecia marcado até recarregar. Agora o painel espera a gravação, avisa com mensagem de erro se falhar e desfaz a mudança na tela.
+- **Vai para a aba certa:** ao marcar Ganho ou Perdido, o funil abre sozinho a aba **Ganhos** ou **Perdidos** (e **Em andamento** ao reabrir).
+- **Reabrir:** negócio Ganho/Perdido mostra o selo da situação e o botão **Reabrir** no painel, e há um botão **Reabrir** em cada linha das abas Ganhos e Perdidos. Limpa a data de fechamento e o motivo da perda. (Reabrir um Ganho não apaga cards já criados nos funis seguintes.)
+- **Pesquisa e lista de clientes:** o negócio também é associado ao cliente pelo título (ignorando prefixos como `[ENGENHARIA]`), para o selo Ganho/Perdido aparecer mesmo quando o nome da organização/pessoa difere.
+
+**Arquivos:** `CrmDataContext.tsx`, `DealDetailPanel.tsx`, `FunnelBoard.tsx`, `clienteDeals.ts`.
+
+---
+
 ## v21 — Campos do negócio editáveis (cards "Negócio" e "Personalizados")
 
 No painel do negócio, os cards **Negócio** e **Personalizados** eram só leitura (o lápis era decorativo). Agora o lápis de cada card liga o modo de edição, com **Salvar** e **Cancelar**.

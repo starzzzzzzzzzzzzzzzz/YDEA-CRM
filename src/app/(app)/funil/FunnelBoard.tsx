@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import {
   Plus, Filter, LayoutGrid, List, Download, Info, X, CalendarCheck2, CalendarX2,
-  CalendarClock, Clock, Flame, Snowflake, Thermometer, User2, Zap,
+  CalendarClock, Clock, Flame, Snowflake, Thermometer, User2, Zap, RotateCcw,
 } from "lucide-react";
 import { Deal, FunnelId, Temperatura, PERFIL_CLIENTE_LABEL, TEMPERATURA_LABEL } from "@/lib/types";
 import { FUNNELS } from "@/lib/funnels";
@@ -697,6 +697,7 @@ export default function FunnelBoard() {
                 {aba !== "aberto" && <th className="px-5 py-3 font-semibold">Situação</th>}
                 {aba === "perdido" && <th className="px-5 py-3 font-semibold">Motivo</th>}
                 <th className="px-5 py-3 font-semibold">Atividade</th>
+                {aba !== "aberto" && <th className="px-5 py-3 font-semibold" />}
               </tr>
             </thead>
             <tbody>
@@ -735,12 +736,31 @@ export default function FunnelBoard() {
                     <td className="px-5 py-3.5">
                       <AtividadeIcone temAtividade={temAtividade} />
                     </td>
+                    {aba !== "aberto" && (
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateDeal(deal.id, { status: "aberto", fechadoEm: undefined, motivoPerda: undefined }).then(
+                              (ok) => {
+                                if (!ok) window.alert("Não consegui reabrir o negócio. Tente de novo.");
+                              }
+                            );
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold text-text-gray hover:bg-panel-bg transition-colors"
+                        >
+                          <RotateCcw size={12} />
+                          Reabrir
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {dealsFiltrados.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-text-faint">
+                  <td colSpan={8} className="px-5 py-10 text-center text-text-faint">
                     {aba === "ganho" ? "Nenhum negócio ganho ainda." : aba === "perdido" ? "Nenhum negócio perdido." : "Nenhum negócio encontrado com esses filtros."}
                   </td>
                 </tr>
@@ -796,6 +816,7 @@ export default function FunnelBoard() {
           dealId={openDealId}
           onClose={fecharDeal}
           onDuplicate={handleDuplicateRequest}
+          onStatusChange={setAba}
           onAtividadesStatusChange={(id, pendente) =>
             setAtividadesStatus((prev) => ({ ...prev, [id]: pendente }))
           }
